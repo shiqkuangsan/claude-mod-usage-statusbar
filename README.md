@@ -1,5 +1,7 @@
 # usage-rings
 
+English | [简体中文](README.zh-CN.md)
+
 ![usage-rings in the Claude desktop app](docs/screenshot.png)
 
 > Early version: the layout and what the band shows are still evolving.
