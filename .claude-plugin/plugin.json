@@ -1,7 +1,7 @@
 {
   "name": "usage-rings",
-  "version": "0.1.0",
-  "description": "Ring gauges above the prompt for context, 5h/7d limits and spend (session, day, month)",
+  "version": "0.2.0",
+  "description": "Ring gauges above the prompt for context, 5h/7d limits with pace and forecast, spend and output speed; tiles or minimal layout, per-part toggles, themes, English and Chinese",
   "author": { "name": "shiqkuangsan" },
   "license": "MIT",
   "repository": "https://github.com/shiqkuangsan/claude-mod-usage-statusbar",
