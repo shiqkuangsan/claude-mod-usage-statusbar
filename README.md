@@ -1,5 +1,9 @@
 # usage-rings
 
+![usage-rings in the Claude desktop app](docs/screenshot.png)
+
+> Early version: the layout and what the band shows are still evolving.
+
 A Claude Code mod that keeps a usage band above the prompt, drawn as ring gauges:
 
 - **ctx**: how full the context window is
