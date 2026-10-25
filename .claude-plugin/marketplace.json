@@ -1,0 +1,5 @@
+{
+  "name": "claude-mod-usage-statusbar",
+  "owner": { "name": "shiqkuangsan" },
+  "plugins": [{ "name": "usage-rings", "source": "./" }]
+}
