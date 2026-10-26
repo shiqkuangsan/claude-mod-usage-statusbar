@@ -49,9 +49,16 @@ const PANE = {
 const colorOf = async (ui: { findAll: (q: { type: string; text: string }) => Promise<{ props: Record<string, unknown> }[]> }, text: string) =>
   (await ui.findAll({ type: 'Text', text })).map(t => t.props.color).find(c => c !== undefined)
 
+// The local calendar day, as the mod keys spend.
+const DAY = (() => {
+  const d = new Date(NOW)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+})()
+
 async function start(...[$, on, surface = 'desktop']: [...Parameters<TestBody>, ('desktop' | 'terminal')?]) {
   mock.clock(on, { now: NOW })
   mock.store(on)
+  on('session.id', () => ({ value: 'session-a' }))
   on('command.register', () => ({ value: { command: 'rings' } }))
   on('session.usage', () => ({
     value: { startedAt: NOW - 2 * 3_600_000, context: { window: 1000000 }, rateLimits: [], cost: { usd: 2 } },
@@ -213,4 +220,45 @@ test('a terminal session starts with the band hidden, and /rings default changes
   expect((await pane.find({ type: 'Button', text: /Desktop/ }))?.text).toBe('○ Desktop')
   await pane.unmount()
   expect((await $.command.run(rings('default'))).text).toContain('Desktop hidden, Terminal shown')
+})
+
+test('today and month sum every session, pick up others within a minute, and keep the 0.3.0 total', async ($, on) => {
+  const clock = mock.clock(on, { now: NOW })
+  // The store every session shares, held here so the test can write as another session would.
+  // Left by 0.3.0 earlier today, by another session today, and by one last month.
+  const store = new Map<string, unknown>([
+    ['ledger', { day: DAY, month: DAY.slice(0, 7), dayUsd: 2, monthUsd: 7 }],
+    [`spend:${DAY}:session-b`, 3],
+    ['spend:2026-09-30:session-c', 100],
+  ])
+  on('store.get', (_, e) => ({ value: store.get(e.key) }))
+  on('store.set', (_, e) => (store.set(e.key, e.value), { value: undefined }))
+  on('store.delete', (_, e) => (store.delete(e.key), { value: undefined }))
+  on('store.keys', () => ({ value: [...store.keys()] }))
+  on('session.id', () => ({ value: 'session-a' }))
+  on('command.register', () => ({ value: { command: 'rings' } }))
+  on('session.usage', () => ({
+    value: { startedAt: NOW, context: { window: 1000000 }, rateLimits: [], cost: { usd: 0 } },
+  }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.measure', (_, e) => ({ changed: e.changed }))
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.session.measure({
+    context: { window: 1000000, tokens: 1000, percent: 0.1 },
+    rateLimits: LIMITS,
+    cost: { usd: 1.5 },
+    changed: ['context', 'rateLimits', 'cost'],
+  })
+  expect(store.get(`spend:${DAY}:session-a`)).toBe(1.5)
+  expect(store.has('spend:2026-09-30:session-c')).toBe(false)
+
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect((await band.find({ type: 'Text', text: /today/ }))?.text).toBe('today $6.50 · mo $11.50')
+
+  // Another session spends; this band shows it at the next minute tick.
+  store.set(`spend:${DAY}:session-b`, 5)
+  await clock.advance(60_000)
+  expect((await band.find({ type: 'Text', text: /today/ }))?.text).toBe('today $8.50 · mo $13.50')
+  await band.unmount()
 })

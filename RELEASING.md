@@ -53,5 +53,6 @@ for p in hooks types tests tsconfig.json .claude-plugin/plugin.json; do diff -rq
 - 改已发布的 release 说明：先改两个 CHANGELOG 并提交，再 `scripts/release-notes.sh X.Y.Z > <文件>`，`gh release edit vX.Y.Z --notes-file <文件>`。
 - README 顶部的版本徽章由 shields.io 读取最新 GitHub release，发版后不用手改，有几分钟缓存；最低 Claude Code 版本变了时，改徽章和 Install 一节里的版本号。
 - 仓库目录的 `validate` 目前有两个已知 warning：`marketplace.json` 缺 `description`，没有 icon。都不影响安装，只有提交到官方插件目录时才需要补。
+- `$.store` 按加载来源分文件：开发版是 `~/.claude/plugins/store/usage-rings_inline-*.json`，正式版是 `usage-rings_claude-mod-usage-statusbar-*.json`。两边的设置和花费账本互不相通，在开发版里改的设置不会带到正式版。
 - 同一个会话里同时加载开发版和正式版时，色带会出现两条。开发时可以先 `claude plugin disable usage-rings@claude-mod-usage-statusbar`，发版后再 `enable`。
 - 回滚：`git revert` 出问题的提交，版本号继续往上加（例如 0.2.1 有问题就发 0.2.2），不要复用已经发过的版本号。

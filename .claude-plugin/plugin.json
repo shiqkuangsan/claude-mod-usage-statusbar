@@ -1,6 +1,6 @@
 {
   "name": "usage-rings",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Ring gauges above the prompt for context, 5h/7d limits with pace and forecast, spend and output speed; tiles or minimal layout, per-part toggles, themes, per-surface default visibility, English and Chinese",
   "author": { "name": "shiqkuangsan" },
   "license": "MIT",

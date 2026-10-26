@@ -4,6 +4,11 @@
 
 每个版本也发布在 [GitHub releases 页面](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases)。已安装的用户运行 `claude plugin update usage-rings@claude-mod-usage-statusbar` 更新，然后执行 `/reload-plugins` 或开新会话。
 
+## 0.3.1 (2026-10-26)
+
+- 修复：同时开着多个会话时，某个会话的今日和本月花费要等它自己再花钱才会更新；现在每条面板最多一分钟内就会算上其他会话的花费。
+- 修复：两个会话恰好同时花钱时，今日和本月总额里可能有一笔被另一笔覆盖。现在每个会话单独记自己的花费，面板显示时再求和。0.3.0 记下的总额会接着累计。
+
 ## 0.3.0 (2026-10-26)
 
 - **按端设置默认显隐**：新会话在桌面端默认显示面板，在终端默认隐藏；VS Code 和移动端跟随桌面端的设置。

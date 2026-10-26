@@ -4,6 +4,11 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 Every release is also on the [GitHub releases page](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases). Update an installed copy with `claude plugin update usage-rings@claude-mod-usage-statusbar`, then `/reload-plugins` or a new session.
 
+## 0.3.1 (2026-10-26)
+
+- Fixed: with several sessions open, a band's today and month figures stayed where they were until that session spent again; every band now picks up the other sessions' spend within a minute.
+- Fixed: two sessions spending at the same moment could overwrite each other's addition to today's and this month's totals. Each session now keeps its own figure and the band sums them. Totals recorded by 0.3.0 carry over.
+
 ## 0.3.0 (2026-10-26)
 
 - **Per-surface default visibility**: new sessions show the band in the desktop app and hide it in the terminal; VS Code and mobile follow the desktop choice.

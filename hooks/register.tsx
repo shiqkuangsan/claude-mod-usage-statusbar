@@ -212,8 +212,10 @@ const settings = atom({ plugin: 'usage-rings', key: 'settings' } as const, DEFAU
 const stream = atom({ plugin: 'usage-rings', key: 'stream' } as const, { isStreaming: false })
 const turn = atom({ plugin: 'usage-rings', key: 'turn' } as const, { startUsd: null, usd: null })
 
-// $.store keys, shared by every session.
+// $.store keys, shared by every session. LEDGER is 0.3.0's single running total,
+// still read for the days it covers; spend now goes under SPEND, one key per session a day.
 const LEDGER = 'ledger'
+const SPEND = 'spend:'
 const LIMITS = 'limits'
 const SETTINGS = 'settings'
 
@@ -399,19 +401,44 @@ async function account($: EngineInterface, usd: number | undefined) {
   const delta = usd - (seen ?? 0)
   if (delta <= 0) return
 
-  const t = await $.clock.now()
-  const day = dayKey(t)
+  // Each session writes only its own key, so sessions spending at once never overwrite each other.
+  const key = `${SPEND}${dayKey(await $.clock.now())}:${await $.session.id()}`
+  const prev = await $.store.get(key)
+  await $.store.set(key, (typeof prev === 'number' ? prev : 0) + delta)
+  await refreshLedger($)
+}
+
+// Today's and this month's totals: every session's keys summed, plus what 0.3.0 kept in LEDGER.
+async function refreshLedger($: EngineInterface) {
+  const day = dayKey(await $.clock.now())
   const month = day.slice(0, 7)
-  const prev = await $.store.get(LEDGER)
-  const last = isLedger(prev) ? prev : null
-  const next: Ledger = {
-    day,
-    month,
-    dayUsd: (last?.day === day ? last.dayUsd : 0) + delta,
-    monthUsd: (last?.month === month ? last.monthUsd : 0) + delta,
+  const legacy = await $.store.get(LEDGER)
+  let dayUsd = isLedger(legacy) && legacy.day === day ? legacy.dayUsd : 0
+  let monthUsd = isLedger(legacy) && legacy.month === month ? legacy.monthUsd : 0
+  for (const key of await $.store.keys()) {
+    if (!key.startsWith(`${SPEND}${month}-`)) continue
+    const usd = await $.store.get(key)
+    if (typeof usd !== 'number') continue
+    monthUsd += usd
+    if (key.startsWith(`${SPEND}${day}:`)) dayUsd += usd
   }
-  await $.store.set(LEDGER, next)
-  await update($, ledger, () => next)
+  // A write redraws the band: skip it when the cents shown would not change.
+  const cents = (v: number) => Math.round(v * 100)
+  await update($, ledger, l =>
+    l && l.day === day && cents(l.dayUsd) === cents(dayUsd) && cents(l.monthUsd) === cents(monthUsd)
+      ? l
+      : { day, month, dayUsd, monthUsd },
+  )
+}
+
+// Drops spend keys, and the 0.3.0 total, from months before this one.
+async function pruneLedger($: EngineInterface) {
+  const month = dayKey(await $.clock.now()).slice(0, 7)
+  for (const key of await $.store.keys()) {
+    if (key.startsWith(SPEND) && !key.startsWith(`${SPEND}${month}-`)) await $.store.delete(key)
+  }
+  const legacy = await $.store.get(LEDGER)
+  if (legacy !== undefined && !(isLedger(legacy) && legacy.month === month)) await $.store.delete(LEDGER)
 }
 
 async function change($: EngineInterface, edit: (s: RingSettings) => RingSettings) {
@@ -519,18 +546,19 @@ export const register: Register = on => {
       const usd = usage.cost.usd
       await update($, seenUsd, () => usd)
     }
-    const saved = await $.store.get(LEDGER)
-    if (isLedger(saved)) await update($, ledger, () => saved)
+    await pruneLedger($)
+    await refreshLedger($)
     const stored = toSettings(await $.store.get(SETTINGS))
     await update($, settings, () => stored)
     // Each surface has its own default; a reload keeps what this session already chose.
     const where: StartSurface = e.surface === 'terminal' ? 'terminal' : 'desktop'
     await update($, isHidden, h => h ?? !stored.startShown[where])
 
-    // Redraw once a minute so the reset countdowns stay current.
+    // Once a minute: redraw so the reset countdowns stay current, and pick up other sessions' spend.
     tick?.cancel()
     tick = $.clock.every(60_000, () => {
       void update($, minute, n => n + 1)
+      void refreshLedger($)
     })
 
     return next(e)
