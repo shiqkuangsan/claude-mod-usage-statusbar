@@ -207,6 +207,10 @@ const PANE = 'rings-settings'
 const MUTED = '#9a9a9a'
 const PHASES = ['○', '◔', '◑', '◕', '●']
 const HOUR = 3_600_000
+
+// An installed release loads from the plugin cache; anything else (a dev-mods folder,
+// --plugin-dir, a test) is a working copy, tagged "dev" on the band.
+const isDevRoot = (root: string) => !root.replace(/\\/g, '/').includes('/plugins/cache/')
 const WINDOWS: Record<string, number> = { five_hour: 5 * HOUR, seven_day: 7 * 24 * HOUR }
 
 type Palette = Record<Slot, string>
@@ -358,6 +362,14 @@ const ring = (percent: number | undefined, color: string, palette: Palette, elap
     `</svg>`
   )
 }
+
+// The dev build's tag: an image, so it keeps this small size whatever the host's box spacing.
+const devTag = (color: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="16" viewBox="0 0 30 16">` +
+  `<rect x="0.5" y="0.5" width="29" height="15" rx="4" fill="none" stroke="${color}"/>` +
+  `<text x="15" y="11.3" text-anchor="middle" font-family="-apple-system,system-ui,sans-serif" ` +
+  `font-size="10" font-weight="600" fill="${color}">dev</text>` +
+  `</svg>`
 
 const swatch = (color: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><rect width="14" height="14" rx="3" fill="${color}"/></svg>`
@@ -750,12 +762,13 @@ export const register: Register = on => {
 
     const ui = $.ui.resolve(e)
     const { Box, Text } = ui
+    const isDev = isDevRoot($.plugin.root)
 
     if (e.surface !== 'terminal' && 'Svg' in ui) {
       const { Svg } = ui
       const size = isMinimal ? 28 : 32
-      return (
-        <Box flexDirection="row" flexWrap="wrap" columnGap={3} rowGap={1} alignItems="center">
+      const band = (
+        <Box flexDirection="row" flexWrap="wrap" columnGap={3} rowGap={1} alignItems="center" flexGrow={1} flexShrink={1}>
           {gauges.map(g => {
             const below = secondLine(g)
             const svg = (
@@ -797,6 +810,15 @@ export const register: Register = on => {
           )}
         </Box>
       )
+      if (!isDev) return band
+      return (
+        <Box flexDirection="row" alignItems="flex-start" justifyContent="space-between" width="100%" gap={1}>
+          {band}
+          <Box key="dev" flexShrink={0} alignSelf="flex-start">
+            <Svg source={devTag(palette.warn)} alt="dev" width={30} height={16} />
+          </Box>
+        </Box>
+      )
     }
 
     // Terminal: no vector element, so a quarter-step circle glyph stands in for each ring,
@@ -811,8 +833,11 @@ export const register: Register = on => {
     })
     const cardText = cards.map(c => (isMinimal ? c.slice(0, 1) : c).map(f => f.text).join(' · '))
     return (
-      <Box flexDirection="column">
-        <Text dimColor>{[...gaugeText, ...cardText].join('   ')}</Text>
+      <Box flexDirection="row" gap={2}>
+        <Box flexGrow={1} flexShrink={1}>
+          <Text dimColor>{[...gaugeText, ...cardText].join('   ')}</Text>
+        </Box>
+        {isDev ? <Text color={palette.warn}>dev</Text> : null}
       </Box>
     )
   })

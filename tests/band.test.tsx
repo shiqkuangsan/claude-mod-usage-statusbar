@@ -71,6 +71,10 @@ async function start(...[$, on]: Parameters<TestBody>) {
 const svgOf = async (ui: { findAll: (q: { type: string }) => Promise<{ props: Record<string, unknown> }[]> }, label: string) =>
   String((await ui.findAll({ type: 'Svg' })).find(r => String(r.props.alt).startsWith(label))?.props.source)
 
+// The ring images, leaving out the dev build's tag.
+const ringCount = async (ui: { findAll: (q: { type: string }) => Promise<{ props: Record<string, unknown> }[]> }) =>
+  (await ui.findAll({ type: 'Svg' })).filter(r => r.props.alt !== 'dev').length
+
 test('tiles: rings with the percentage inside, a second line each, spend and speed cards', async ($, on) => {
   await start($, on)
 
@@ -90,6 +94,8 @@ test('tiles: rings with the percentage inside, a second line each, spend and spe
   expect(String((await desktop.findAll({ type: 'Svg' }))[0]?.props.isInteractive)).toBe('undefined')
   expect(await svgOf(desktop, 'ctx')).not.toContain('<line')
   expect(await desktop.find({ type: 'Text', text: /cache|ttft/ })).toBe(undefined)
+  // Loaded from a working copy, not the plugin cache: tagged as the dev build.
+  expect(await svgOf(desktop, 'dev')).toContain('stroke="#f59e0b"')
   await desktop.unmount()
 
   const terminal = await $.ui.mount({ ...BAND, surface: 'terminal' })
@@ -121,7 +127,7 @@ test('/rings switches the language, the parts, the colors and the layout', async
 
   await $.command.run(rings('mode minimal'))
   const minimal = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect((await minimal.findAll({ type: 'Svg' })).length).toBe(3)
+  expect(await ringCount(minimal)).toBe(3)
   expect(await minimal.find({ type: 'Text', text: /5h|用满|本月/ })).toBe(undefined)
   expect((await minimal.find({ type: 'Text', text: '$15.24' }))?.text).toBe('$15.24')
   await minimal.unmount()
@@ -148,7 +154,7 @@ test('the settings pane toggles parts and picks the layout and language', async 
     const band = await $.ui.mount({ ...BAND, surface })
     expect(await band.find({ type: 'Text', text: /上下文|用满/ })).toBe(undefined)
     if (surface === 'terminal') expect((await band.find({ type: 'Text', text: /5h/ }))?.text).toContain('◑ 60% ▲ 5h')
-    else expect((await band.findAll({ type: 'Svg' })).length).toBe(3)
+    else expect(await ringCount(band)).toBe(3)
     await band.unmount()
   }
 })
