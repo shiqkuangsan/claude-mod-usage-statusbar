@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-[![release](https://img.shields.io/github/v/release/shiqkuangsan/claude-mod-usage-statusbar)](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases) · Current version: **0.3.0** · [Changelog](CHANGELOG.md)
+[![release](https://img.shields.io/github/v/release/shiqkuangsan/claude-mod-usage-statusbar?color=22c55e)](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases) [![changelog](https://img.shields.io/badge/changelog-view-3b82f6)](CHANGELOG.md) [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A5%202.1.287-d97757)](#install) [![license](https://img.shields.io/github/license/shiqkuangsan/claude-mod-usage-statusbar)](LICENSE)
 
 ![usage-rings in the Claude desktop app](docs/screenshot.png)
 

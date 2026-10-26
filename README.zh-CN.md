@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-[![release](https://img.shields.io/github/v/release/shiqkuangsan/claude-mod-usage-statusbar)](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases) · 当前版本：**0.3.0** · [更新日志](CHANGELOG.zh-CN.md)
+[![release](https://img.shields.io/github/v/release/shiqkuangsan/claude-mod-usage-statusbar?color=22c55e)](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases) [![更新日志](https://img.shields.io/badge/%E6%9B%B4%E6%96%B0%E6%97%A5%E5%BF%97-%E6%9F%A5%E7%9C%8B-3b82f6)](CHANGELOG.zh-CN.md) [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A5%202.1.287-d97757)](#安装) [![license](https://img.shields.io/github/license/shiqkuangsan/claude-mod-usage-statusbar)](LICENSE)
 
 ![usage-rings 在 Claude 桌面端的效果](docs/screenshot.png)
 
