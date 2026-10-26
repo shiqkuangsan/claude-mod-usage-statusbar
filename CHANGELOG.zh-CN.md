@@ -4,6 +4,11 @@
 
 每个版本也发布在 [GitHub releases 页面](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases)。已安装的用户运行 `claude plugin update usage-rings@claude-mod-usage-statusbar` 更新，然后执行 `/reload-plugins` 或开新会话。
 
+## 0.4.0 (2026-10-26)
+
+- 本会话花费旁边加上 `本会话` 标注，和覆盖所有会话的今日、本月合计区分开。开了好几天的会话，这里显示的是它开着以来的全部花费，而今日只算当天。
+- 新增组件 `session-today`（本会话今日花费），默认关闭，用 `/rings show session-today` 或设置面板打开。
+
 ## 0.3.2 (2026-10-26)
 
 - 修复：今日和本月花费不包含 mod 加载之前会话已经花掉的钱，所以安装、更新或重载之后，可能远低于各会话自己的花费。现在今天开始的会话从第一条消息算起，不管 mod 什么时候加载；更早开始的会话从 mod 当天第一次看到它时算起。

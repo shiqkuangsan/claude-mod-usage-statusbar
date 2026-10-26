@@ -4,6 +4,11 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 Every release is also on the [GitHub releases page](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases). Update an installed copy with `claude plugin update usage-rings@claude-mod-usage-statusbar`, then `/reload-plugins` or a new session.
 
+## 0.4.0 (2026-10-26)
+
+- The session's figure is marked `session`, so it reads apart from today's and this month's totals, which cover every session. A session left open for days shows its whole cost there, while today counts only this day.
+- New part `session-today`, off by default: this session's own spend today. `/rings show session-today` or the settings pane turns it on.
+
 ## 0.3.2 (2026-10-26)
 
 - Fixed: today's and this month's spend left out what a session had spent before the mod loaded in it, so after an install, an update or a reload they could read far below the sessions' own figures. A session begun today now counts from its first message, whenever the mod loaded; one begun on an earlier day counts from when the mod first saw it that day.

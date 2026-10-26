@@ -12,6 +12,7 @@ const PART_IDS: Part[] = [
   'pace',
   'forecast',
   'session',
+  'session-today',
   'day',
   'month',
   'turn',
@@ -20,7 +21,7 @@ const PART_IDS: Part[] = [
   'speed',
   'ttft',
 ]
-const OFF_BY_DEFAULT: Part[] = ['turn', 'rate', 'cache', 'ttft']
+const OFF_BY_DEFAULT: Part[] = ['session-today', 'turn', 'rate', 'cache', 'ttft']
 
 const SLOTS: Slot[] = ['ok', 'warn', 'danger', 'pace', 'track', 'accent']
 const PRESETS: Record<Preset, Record<Slot, string>> = {
@@ -52,6 +53,7 @@ const TEXT = {
       pace: 'Pace tick',
       forecast: 'Forecast',
       session: 'Session spend',
+      'session-today': 'Session today',
       day: 'Today spend',
       month: 'Month spend',
       turn: 'Turn spend',
@@ -71,6 +73,8 @@ const TEXT = {
     used: (label: string, p: string) => `${label}: ${p} used`,
     resetsIn: (x: string) => `resets in ${x}`,
     gone: (p: number) => `${p}% of the window gone`,
+    sessionLabel: 'session',
+    sessionToday: (v: string) => `session today ${v}`,
     today: (v: string) => `today ${v}`,
     month: (v: string) => `mo ${v}`,
     turn: (v: string) => `${v}/turn`,
@@ -131,6 +135,7 @@ const TEXT = {
       pace: '时间刻度',
       forecast: '用满预测',
       session: '本会话花费',
+      'session-today': '本会话今日',
       day: '今日花费',
       month: '本月花费',
       turn: '本轮花费',
@@ -150,6 +155,8 @@ const TEXT = {
     used: (label: string, p: string) => `${label}：已用 ${p}`,
     resetsIn: (x: string) => `${x} 后重置`,
     gone: (p: number) => `时间已过 ${p}%`,
+    sessionLabel: '本会话',
+    sessionToday: (v: string) => `本会话今日 ${v}`,
     today: (v: string) => `今日 ${v}`,
     month: (v: string) => `本月 ${v}`,
     turn: (v: string) => `本轮 ${v}`,
@@ -211,6 +218,7 @@ const minute = atom({ plugin: 'usage-rings', key: 'minute' } as const, 0)
 const settings = atom({ plugin: 'usage-rings', key: 'settings' } as const, DEFAULTS)
 const stream = atom({ plugin: 'usage-rings', key: 'stream' } as const, { isStreaming: false })
 const turn = atom({ plugin: 'usage-rings', key: 'turn' } as const, { startUsd: null, usd: null })
+const sessionDay = atom({ plugin: 'usage-rings', key: 'sessionDay' } as const, null)
 
 // $.store keys, shared by every session. A session's spend on a day is one figure under
 // USD + `<day>:<session id>:<startedAt>`, set (never added to), so a reload or a resume
@@ -251,7 +259,7 @@ type Gauge = {
   note?: string
 }
 // One line of text on a tile; `color` marks the value that leads it.
-type Figure = { key: string; text: string; color?: string; isDim?: boolean }
+type Figure = { key: string; text: string; color?: string; isDim?: boolean; label?: string }
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v))
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -421,6 +429,7 @@ async function account($: EngineInterface, usd: number | undefined) {
   }
   const spent = Math.max(0, usd - base)
   if ((await $.store.get(USD + segment)) !== spent) await $.store.set(USD + segment, spent)
+  await update($, sessionDay, d => (d?.day === day && d.usd === spent ? d : { day, usd: spent }))
   await refreshLedger($)
 }
 
@@ -844,7 +853,11 @@ export const register: Register = on => {
     const sessionUsd = snap.sessionUsd ?? 0
     const hours = snap.startedAt === undefined ? 0 : (t - snap.startedAt) / HOUR
     const spend: Figure[] = []
-    if (show.session) spend.push({ key: 'session', text: money(sessionUsd), color: palette.accent })
+    if (show.session)
+      spend.push({ key: 'session', text: money(sessionUsd), color: palette.accent, label: w.sessionLabel })
+    const mine = await read($, sessionDay)
+    if (show['session-today'])
+      spend.push({ key: 'session-today', text: w.sessionToday(money(mine?.day === today ? mine.usd : 0)) })
     if (show.day) spend.push({ key: 'day', text: w.today(money(book?.day === today ? book.dayUsd : 0)) })
     if (show.month)
       spend.push({ key: 'month', text: w.month(money(book?.month === today.slice(0, 7) ? book.monthUsd : 0)) })
@@ -899,9 +912,18 @@ export const register: Register = on => {
           {cards.map(([lead, ...rest]) =>
             lead === undefined ? null : (
               <Box key={`card-${lead.key}`} flexDirection="column">
-                <Text weight="semibold" color={lead.color} tabular>
-                  {lead.text}
-                </Text>
+                {lead.label && !isMinimal ? (
+                  <Box flexDirection="row" gap={1}>
+                    <Text weight="semibold" color={lead.color} tabular>
+                      {lead.text}
+                    </Text>
+                    <Text dimColor>{lead.label}</Text>
+                  </Box>
+                ) : (
+                  <Text weight="semibold" color={lead.color} tabular>
+                    {lead.text}
+                  </Text>
+                )}
                 {!isMinimal && rest.length > 0 ? (
                   <Text size="footnote" dimColor tabular>
                     {rest.map(f => f.text).join(' · ')}
@@ -933,7 +955,9 @@ export const register: Register = on => {
       const below = isMinimal ? undefined : secondLine(g)
       return `${head}${pace} ${g.label}${below ? ` ${below.text}` : ''}`
     })
-    const cardText = cards.map(c => (isMinimal ? c.slice(0, 1) : c).map(f => f.text).join(' · '))
+    const cardText = cards.map(c =>
+      (isMinimal ? c.slice(0, 1) : c).map(f => (f.label && !isMinimal ? `${f.text} ${f.label}` : f.text)).join(' · '),
+    )
     return (
       <Box flexDirection="row" gap={2}>
         <Box flexGrow={1} flexShrink={1}>

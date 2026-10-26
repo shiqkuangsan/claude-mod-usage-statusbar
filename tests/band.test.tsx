@@ -90,6 +90,8 @@ test('tiles: rings with the percentage inside, a second line each, spend and spe
     expect((await desktop.find({ type: 'Text', text: words }))?.text).toBe(words)
   }
   expect(await colorOf(desktop, '$15.24')).toBe('#22c55e')
+  // The session's own total says so; today and month are every session's.
+  expect((await desktop.find({ type: 'Text', text: 'session' }))?.text).toBe('session')
   expect(await colorOf(desktop, 'full ~25m')).toBe('#f59e0b')
   // 5h runs out before its reset: amber ring, its percentage inside, a tick where the time is.
   const fiveHour = await svgOf(desktop, '5h')
@@ -110,7 +112,7 @@ test('tiles: rings with the percentage inside, a second line each, spend and spe
   expect(line).toContain('◑ 38% ctx 380k / 1M')
   expect(line).toContain('◑ 60% ▲ 5h full ~25m')
   expect(line).toContain('◔ 25% ▽ 7d 4d17h')
-  expect(line).toContain('$15.24 · today $15.24 · mo $15.24')
+  expect(line).toContain('$15.24 session · today $15.24 · mo $15.24')
   await terminal.unmount()
 })
 
@@ -292,4 +294,12 @@ test('a session begun on an earlier day counts only from when the mod first saw 
   expect(await totals()).toBe('today $0.00 · mo $0.00')
   await spend(12)
   expect(await totals()).toBe('today $2.00 · mo $2.00')
+
+  // Off by default: this session's own spend today, beside its whole total.
+  await $.command.run(rings('show session-today'))
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect((await band.find({ type: 'Text', text: /session today/ }))?.text).toBe(
+    'session today $2.00 · today $2.00 · mo $2.00',
+  )
+  await band.unmount()
 })

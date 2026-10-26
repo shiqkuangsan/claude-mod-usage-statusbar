@@ -20,6 +20,7 @@ export type Part =
   | 'pace'
   | 'forecast'
   | 'session'
+  | 'session-today'
   | 'day'
   | 'month'
   | 'turn'
@@ -50,6 +51,8 @@ export type RingStream = {
   cacheHit?: number
 }
 export type RingTurn = { startUsd: number | null; usd: number | null }
+// What this session has spent on `day`, as the ledger records it.
+export type RingSessionDay = { day: string; usd: number }
 
 declare module 'claude-code' {
   interface PluginState {
@@ -63,6 +66,7 @@ declare module 'claude-code' {
       settings: RingSettings
       stream: RingStream
       turn: RingTurn
+      sessionDay: RingSessionDay | null
     }
   }
 }
