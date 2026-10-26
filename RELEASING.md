@@ -36,12 +36,14 @@ for p in hooks types tests tsconfig.json .claude-plugin/plugin.json; do diff -rq
 | 开发 | 在开发目录里改，桌面端和终端各看一眼效果 | 用户确认效果 |
 | 检查 | `npx -y -p typescript@5.6.3 tsc -p $D`；`claude plugin validate $D`；`claude plugin test $D` | 无类型错误，校验通过，测试全过 |
 | 版本号 | 改 `.claude-plugin/plugin.json` 的 `version`（semver：修 bug 改 patch，新功能改 minor） | 版本号比上一个发布高 |
-| 文档 | 同时更新 `README.md` 和 `README.zh-CN.md`；界面有变化时换 `docs/screenshot.png`，`plugin.json` 的 `description` 也要跟上 | 中英文内容一致 |
+| 文档 | 同时更新 `README.md` 和 `README.zh-CN.md`，包括顶部的“当前版本”；界面有变化时换 `docs/screenshot.png`，`plugin.json` 的 `description` 也要跟上 | 中英文内容一致 |
+| 更新日志 | 在 `CHANGELOG.md` 顶部加 `## X.Y.Z (YYYY-MM-DD)` 一节，写用户能感知的变化 | 和这次的 diff 对得上 |
 | 同步 | 按上面的同步规则复制到仓库，`diff` 核对 | `diff` 无输出 |
 | 仓库检查 | `claude plugin validate $R`；`claude plugin test $R` | 同上 |
 | 扫描 | 对要提交的文件跑一次密钥扫描（`scan_secrets` 工具或 `gitleaks detect`），再人工看一遍有没有内网地址或别人的数据 | 无发现 |
 | 提交 | 列出确切文件清单后再 `git commit`；commit message 用英文，`feat:` / `fix:` / `docs:` 前缀，新版本号写在标题括号里 | — |
 | 推送 | `git push origin main`，单独执行 | GitHub 上能看到新提交 |
+| GitHub release | 把 `CHANGELOG.md` 里这一节存成 notes 文件，`gh release create vX.Y.Z --target <发版提交 sha> --title "vX.Y.Z" --notes-file <文件>`；它会在远端建 tag，之后 `git fetch --tags` 同步到本地 | releases 页面和 README 的徽章显示新版本 |
 | 更新本机 | `claude plugin marketplace update claude-mod-usage-statusbar`，再 `claude plugin update usage-rings@claude-mod-usage-statusbar`，然后在会话里 `/reload-plugins` 或开新会话 | `claude plugin list` 显示新版本 |
 
 ## 注意

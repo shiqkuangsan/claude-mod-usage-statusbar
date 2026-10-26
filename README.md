@@ -2,6 +2,8 @@
 
 English | [简体中文](README.zh-CN.md)
 
+[![release](https://img.shields.io/github/v/release/shiqkuangsan/claude-mod-usage-statusbar)](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases) · Current version: **0.3.0** · [Changelog](CHANGELOG.md)
+
 ![usage-rings in the Claude desktop app](docs/screenshot.png)
 
 > Early version: the layout and what the band shows are still evolving.
