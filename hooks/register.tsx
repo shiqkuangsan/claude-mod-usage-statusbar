@@ -212,8 +212,14 @@ const settings = atom({ plugin: 'usage-rings', key: 'settings' } as const, DEFAU
 const stream = atom({ plugin: 'usage-rings', key: 'stream' } as const, { isStreaming: false })
 const turn = atom({ plugin: 'usage-rings', key: 'turn' } as const, { startUsd: null, usd: null })
 
-// $.store keys, shared by every session. LEDGER is 0.3.0's single running total,
-// still read for the days it covers; spend now goes under SPEND, one key per session a day.
+// $.store keys, shared by every session. A session's spend on a day is one figure under
+// USD + `<day>:<session id>:<startedAt>`, set (never added to), so a reload or a resume
+// cannot count it twice; BASE + the same holds what it had cost when that day began.
+// LEDGER (0.3.0) and SPEND (0.3.1) are the older ledgers, read only for days before SINCE,
+// the day this scheme first ran.
+const USD = 'usd:'
+const BASE = 'base:'
+const SINCE = 'since'
 const LEDGER = 'ledger'
 const SPEND = 'spend:'
 const LIMITS = 'limits'
@@ -398,29 +404,52 @@ async function account($: EngineInterface, usd: number | undefined) {
   if (usd === undefined) return
   const seen = await read($, seenUsd)
   await update($, seenUsd, () => usd)
-  const delta = usd - (seen ?? 0)
-  if (delta <= 0) return
 
-  // Each session writes only its own key, so sessions spending at once never overwrite each other.
-  const key = `${SPEND}${dayKey(await $.clock.now())}:${await $.session.id()}`
-  const prev = await $.store.get(key)
-  await $.store.set(key, (typeof prev === 'number' ? prev : 0) + delta)
+  const day = dayKey(await $.clock.now())
+  const startedAt = (await read($, snapshot))?.startedAt
+  const segment = `${day}:${await $.session.id()}:${startedAt ?? 0}`
+  // A session begun today counts from its first message, whenever the mod loaded. One begun
+  // earlier counts from what it had cost when this day began here: the last cost seen.
+  let base = 0
+  if (startedAt === undefined || dayKey(startedAt) !== day) {
+    const kept = await $.store.get(BASE + segment)
+    if (typeof kept === 'number') base = kept
+    else {
+      base = Math.min(seen ?? usd, usd)
+      await $.store.set(BASE + segment, base)
+    }
+  }
+  const spent = Math.max(0, usd - base)
+  if ((await $.store.get(USD + segment)) !== spent) await $.store.set(USD + segment, spent)
   await refreshLedger($)
 }
 
-// Today's and this month's totals: every session's keys summed, plus what 0.3.0 kept in LEDGER.
+// The day a store key's figure belongs to, from `<prefix><YYYY-MM-DD>...`.
+const dayOf = (key: string, prefix: string) => key.slice(prefix.length, prefix.length + 10)
+
+// Today's and this month's totals: every session's figures summed, plus the older ledgers'
+// figures for days before this scheme ran.
 async function refreshLedger($: EngineInterface) {
   const day = dayKey(await $.clock.now())
   const month = day.slice(0, 7)
-  const legacy = await $.store.get(LEDGER)
-  let dayUsd = isLedger(legacy) && legacy.day === day ? legacy.dayUsd : 0
-  let monthUsd = isLedger(legacy) && legacy.month === month ? legacy.monthUsd : 0
-  for (const key of await $.store.keys()) {
-    if (!key.startsWith(`${SPEND}${month}-`)) continue
-    const usd = await $.store.get(key)
-    if (typeof usd !== 'number') continue
+  const kept = await $.store.get(SINCE)
+  const since = typeof kept === 'string' ? kept : day
+  let dayUsd = 0
+  let monthUsd = 0
+  const add = (d: string, usd: unknown) => {
+    if (typeof usd !== 'number' || d.slice(0, 7) !== month) return
     monthUsd += usd
-    if (key.startsWith(`${SPEND}${day}:`)) dayUsd += usd
+    if (d === day) dayUsd += usd
+  }
+  for (const key of await $.store.keys()) {
+    if (key.startsWith(USD)) add(dayOf(key, USD), await $.store.get(key))
+    else if (key.startsWith(SPEND) && dayOf(key, SPEND) < since) add(dayOf(key, SPEND), await $.store.get(key))
+  }
+  const legacy = await $.store.get(LEDGER)
+  if (isLedger(legacy) && legacy.month === month) {
+    const isOlder = legacy.day < since
+    monthUsd += legacy.monthUsd - (isOlder ? 0 : legacy.dayUsd)
+    if (isOlder && legacy.day === day) dayUsd += legacy.dayUsd
   }
   // A write redraws the band: skip it when the cents shown would not change.
   const cents = (v: number) => Math.round(v * 100)
@@ -431,11 +460,14 @@ async function refreshLedger($: EngineInterface) {
   )
 }
 
-// Drops spend keys, and the 0.3.0 total, from months before this one.
+// Drops figures from months before this one, and marks the day this scheme first ran.
 async function pruneLedger($: EngineInterface) {
-  const month = dayKey(await $.clock.now()).slice(0, 7)
+  const day = dayKey(await $.clock.now())
+  const month = day.slice(0, 7)
+  if (typeof (await $.store.get(SINCE)) !== 'string') await $.store.set(SINCE, day)
   for (const key of await $.store.keys()) {
-    if (key.startsWith(SPEND) && !key.startsWith(`${SPEND}${month}-`)) await $.store.delete(key)
+    const prefix = [USD, BASE, SPEND].find(p => key.startsWith(p))
+    if (prefix && dayOf(key, prefix).slice(0, 7) !== month) await $.store.delete(key)
   }
   const legacy = await $.store.get(LEDGER)
   if (legacy !== undefined && !(isLedger(legacy) && legacy.month === month)) await $.store.delete(LEDGER)
@@ -541,12 +573,13 @@ export const register: Register = on => {
     }
     await update($, snapshot, () => snap)
 
-    // Count only spend that happens from here on, so a resumed session or a reload adds nothing twice.
+    // What it had cost when the mod first saw it: where a session begun on an earlier day counts from.
     if ((await read($, seenUsd)) === null && usage.cost) {
       const usd = usage.cost.usd
       await update($, seenUsd, () => usd)
     }
     await pruneLedger($)
+    await account($, usage.cost?.usd)
     await refreshLedger($)
     const stored = toSettings(await $.store.get(SETTINGS))
     await update($, settings, () => stored)

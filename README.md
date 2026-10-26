@@ -71,7 +71,7 @@ Requires Claude Code 2.1.287 or later.
 ## Notes
 
 - Everything shown comes from the usage figures Claude Code reports to the mod. It makes no network calls and reads no files.
-- Day and month spend are summed by the mod itself from the time it is installed, across sessions, using Claude Code's plugin storage. Spend from before the install is not counted. With several sessions open, each band picks up the others' spend within a minute.
+- Day and month spend are summed by the mod itself across sessions, using Claude Code's plugin storage. A session begun today counts from its first message, even when the mod loaded later; one begun on an earlier day counts from when the mod first saw it that day. Days before the install are not counted. With several sessions open, each band picks up the others' spend within a minute.
 - The live speed is an estimate from the characters streamed (about four per token, one per CJK character); thinking the interface does not show is not counted until the response ends. The figure after a response ends uses the token count the API reports. Subagents' responses are left out.
 - The forecast uses the average rate since the window began, and appears once 5% of the window has gone by.
 - A fresh session shows the last saved rate-limit reading until its first response arrives; context shows `–` until then.

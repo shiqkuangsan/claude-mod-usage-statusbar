@@ -4,6 +4,12 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 Every release is also on the [GitHub releases page](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases). Update an installed copy with `claude plugin update usage-rings@claude-mod-usage-statusbar`, then `/reload-plugins` or a new session.
 
+## 0.3.2 (2026-10-26)
+
+- Fixed: today's and this month's spend left out what a session had spent before the mod loaded in it, so after an install, an update or a reload they could read far below the sessions' own figures. A session begun today now counts from its first message, whenever the mod loaded; one begun on an earlier day counts from when the mod first saw it that day.
+- Each session's figure for a day is now recorded as one total rather than added to, so a reload or a resumed session cannot count the same spend twice.
+- On the day of this update, today's figure starts from the sessions' own totals; the older ledgers still count for earlier days of the month.
+
 ## 0.3.1 (2026-10-26)
 
 - Fixed: with several sessions open, a band's today and month figures stayed where they were until that session spent again; every band now picks up the other sessions' spend within a minute.

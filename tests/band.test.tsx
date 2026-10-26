@@ -86,7 +86,7 @@ test('tiles: rings with the percentage inside, a second line each, spend and spe
   await start($, on)
 
   const desktop = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  for (const words of ['ctx', '380k / 1M', '5h', 'full ~25m', '7d', '4d17h', 'Fable', '$15.24', 'today $13.24 · mo $13.24']) {
+  for (const words of ['ctx', '380k / 1M', '5h', 'full ~25m', '7d', '4d17h', 'Fable', '$15.24', 'today $15.24 · mo $15.24']) {
     expect((await desktop.find({ type: 'Text', text: words }))?.text).toBe(words)
   }
   expect(await colorOf(desktop, '$15.24')).toBe('#22c55e')
@@ -110,7 +110,7 @@ test('tiles: rings with the percentage inside, a second line each, spend and spe
   expect(line).toContain('◑ 38% ctx 380k / 1M')
   expect(line).toContain('◑ 60% ▲ 5h full ~25m')
   expect(line).toContain('◔ 25% ▽ 7d 4d17h')
-  expect(line).toContain('$15.24 · today $13.24 · mo $13.24')
+  expect(line).toContain('$15.24 · today $15.24 · mo $15.24')
   await terminal.unmount()
 })
 
@@ -123,7 +123,7 @@ test('/rings switches the language, the parts, the colors and the layout', async
   expect((await $.command.run(rings('color ok red'))).text).toContain('#rgb')
 
   const zh = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  for (const words of ['约 25m 用满', '本月 $13.24']) {
+  for (const words of ['约 25m 用满', '本月 $15.24']) {
     expect((await zh.find({ type: 'Text', text: words }))?.text).toBe(words)
   }
   expect(await zh.find({ type: 'Text', text: /上下文|今日/ })).toBe(undefined)
@@ -222,15 +222,11 @@ test('a terminal session starts with the band hidden, and /rings default changes
   expect((await $.command.run(rings('default'))).text).toContain('Desktop hidden, Terminal shown')
 })
 
-test('today and month sum every session, pick up others within a minute, and keep the 0.3.0 total', async ($, on) => {
+// A session for the ledger tests: the store held by the test, so it can write as other sessions do.
+async function ledgerSession(
+  ...[$, on, store, opts]: [...Parameters<TestBody>, Map<string, unknown>, { startedAt: number; usdAtStart: number }]
+) {
   const clock = mock.clock(on, { now: NOW })
-  // The store every session shares, held here so the test can write as another session would.
-  // Left by 0.3.0 earlier today, by another session today, and by one last month.
-  const store = new Map<string, unknown>([
-    ['ledger', { day: DAY, month: DAY.slice(0, 7), dayUsd: 2, monthUsd: 7 }],
-    [`spend:${DAY}:session-b`, 3],
-    ['spend:2026-09-30:session-c', 100],
-  ])
   on('store.get', (_, e) => ({ value: store.get(e.key) }))
   on('store.set', (_, e) => (store.set(e.key, e.value), { value: undefined }))
   on('store.delete', (_, e) => (store.delete(e.key), { value: undefined }))
@@ -238,27 +234,62 @@ test('today and month sum every session, pick up others within a minute, and kee
   on('session.id', () => ({ value: 'session-a' }))
   on('command.register', () => ({ value: { command: 'rings' } }))
   on('session.usage', () => ({
-    value: { startedAt: NOW, context: { window: 1000000 }, rateLimits: [], cost: { usd: 0 } },
+    value: { startedAt: opts.startedAt, context: { window: 1000000 }, rateLimits: [], cost: { usd: opts.usdAtStart } },
   }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.measure', (_, e) => ({ changed: e.changed }))
-
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
-  await $.session.measure({
-    context: { window: 1000000, tokens: 1000, percent: 0.1 },
-    rateLimits: LIMITS,
-    cost: { usd: 1.5 },
-    changed: ['context', 'rateLimits', 'cost'],
-  })
-  expect(store.get(`spend:${DAY}:session-a`)).toBe(1.5)
-  expect(store.has('spend:2026-09-30:session-c')).toBe(false)
+  const spend = (usd: number) =>
+    $.session.measure({
+      context: { window: 1000000, tokens: 1000, percent: 0.1 },
+      rateLimits: LIMITS,
+      cost: { usd },
+      changed: ['context', 'rateLimits', 'cost'],
+    })
+  const totals = async () => {
+    const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    const text = (await band.find({ type: 'Text', text: /today/ }))?.text
+    await band.unmount()
+    return text
+  }
+  return { clock, spend, totals }
+}
 
-  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect((await band.find({ type: 'Text', text: /today/ }))?.text).toBe('today $6.50 · mo $11.50')
+const MONTH = DAY.slice(0, 7)
+
+test('a session begun today counts from its first message, and every session is summed once', async ($, on) => {
+  const store = new Map<string, unknown>([
+    // Another session's figure today, and one from last month that gets dropped.
+    [`usd:${DAY}:session-b:${NOW}`, 3],
+    ['usd:2026-09-30:session-c:0', 100],
+    // The older ledgers: today's part overlaps the new figures and is left out; earlier days count.
+    ['ledger', { day: DAY, month: MONTH, dayUsd: 2, monthUsd: 7 }],
+    [`spend:${DAY}:session-a`, 1],
+    [`spend:${MONTH}-01:session-x`, 4],
+  ])
+  // Begun two hours ago, $2 spent before the mod loaded.
+  const { clock, spend, totals } = await ledgerSession($, on, store, { startedAt: NOW - 2 * 3_600_000, usdAtStart: 2 })
+  expect(store.get(`usd:${DAY}:session-a:${NOW - 2 * 3_600_000}`)).toBe(2)
+  expect(store.has('usd:2026-09-30:session-c:0')).toBe(false)
+
+  await spend(3.5)
+  // today: a 3.50 + b 3; month adds the 0.3.0 ledger's earlier days (7 - 2) and the 0.3.1 key from the 1st.
+  expect(await totals()).toBe('today $6.50 · mo $15.50')
+
+  // The same reading again, as after a reload or a resume, adds nothing.
+  await spend(3.5)
+  expect(await totals()).toBe('today $6.50 · mo $15.50')
 
   // Another session spends; this band shows it at the next minute tick.
-  store.set(`spend:${DAY}:session-b`, 5)
+  store.set(`usd:${DAY}:session-b:${NOW}`, 5)
   await clock.advance(60_000)
-  expect((await band.find({ type: 'Text', text: /today/ }))?.text).toBe('today $8.50 · mo $13.50')
-  await band.unmount()
+  expect(await totals()).toBe('today $8.50 · mo $17.50')
+})
+
+test('a session begun on an earlier day counts only from when the mod first saw it today', async ($, on) => {
+  const store = new Map<string, unknown>()
+  const { spend, totals } = await ledgerSession($, on, store, { startedAt: NOW - 2 * 86_400_000, usdAtStart: 10 })
+  expect(await totals()).toBe('today $0.00 · mo $0.00')
+  await spend(12)
+  expect(await totals()).toBe('today $2.00 · mo $2.00')
 })
