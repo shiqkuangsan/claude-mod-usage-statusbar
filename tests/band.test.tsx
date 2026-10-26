@@ -86,7 +86,7 @@ test('tiles: rings with the percentage inside, a second line each, spend and spe
   await start($, on)
 
   const desktop = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  for (const words of ['ctx', '380k / 1M', '5h', 'full ~25m', '7d', '4d17h', 'Fable', '$15.24', 'today $15.24 · mo $15.24']) {
+  for (const words of ['ctx', '380k / 1M', '5h', 'full ~25m', '7d', '4d17h', 'Fable', '$15.24', 'all: today $15.24 · mo $15.24']) {
     expect((await desktop.find({ type: 'Text', text: words }))?.text).toBe(words)
   }
   expect(await colorOf(desktop, '$15.24')).toBe('#22c55e')
@@ -112,7 +112,7 @@ test('tiles: rings with the percentage inside, a second line each, spend and spe
   expect(line).toContain('◑ 38% ctx 380k / 1M')
   expect(line).toContain('◑ 60% ▲ 5h full ~25m')
   expect(line).toContain('◔ 25% ▽ 7d 4d17h')
-  expect(line).toContain('$15.24 session · today $15.24 · mo $15.24')
+  expect(line).toContain('$15.24 session · all: today $15.24 · mo $15.24')
   await terminal.unmount()
 })
 
@@ -125,7 +125,7 @@ test('/rings switches the language, the parts, the colors and the layout', async
   expect((await $.command.run(rings('color ok red'))).text).toContain('#rgb')
 
   const zh = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  for (const words of ['约 25m 用满', '本月 $15.24']) {
+  for (const words of ['约 25m 用满', '全部：本月 $15.24']) {
     expect((await zh.find({ type: 'Text', text: words }))?.text).toBe(words)
   }
   expect(await zh.find({ type: 'Text', text: /上下文|今日/ })).toBe(undefined)
@@ -276,30 +276,35 @@ test('a session begun today counts from its first message, and every session is 
 
   await spend(3.5)
   // today: a 3.50 + b 3; month adds the 0.3.0 ledger's earlier days (7 - 2) and the 0.3.1 key from the 1st.
-  expect(await totals()).toBe('today $6.50 · mo $15.50')
+  expect(await totals()).toBe('all: today $6.50 · mo $15.50')
 
   // The same reading again, as after a reload or a resume, adds nothing.
   await spend(3.5)
-  expect(await totals()).toBe('today $6.50 · mo $15.50')
+  expect(await totals()).toBe('all: today $6.50 · mo $15.50')
 
   // Another session spends; this band shows it at the next minute tick.
   store.set(`usd:${DAY}:session-b:${NOW}`, 5)
   await clock.advance(60_000)
-  expect(await totals()).toBe('today $8.50 · mo $17.50')
+  expect(await totals()).toBe('all: today $8.50 · mo $17.50')
+
+  // Scoped to this session, begun today: its whole cost, for the day and the month.
+  await $.command.run(rings('scope session'))
+  expect(await totals()).toBe('session: today $3.50 · mo $3.50')
 })
 
-test('a session begun on an earlier day counts only from when the mod first saw it today', async ($, on) => {
+test('a session begun on an earlier day counts today from when the mod saw it, and the month in full', async ($, on) => {
   const store = new Map<string, unknown>()
   const { spend, totals } = await ledgerSession($, on, store, { startedAt: NOW - 2 * 86_400_000, usdAtStart: 10 })
-  expect(await totals()).toBe('today $0.00 · mo $0.00')
+  // Begun this month: its whole cost counts for the month, everywhere; today only what follows.
+  expect(await totals()).toBe('all: today $0.00 · mo $10.00')
   await spend(12)
-  expect(await totals()).toBe('today $2.00 · mo $2.00')
+  expect(await totals()).toBe('all: today $2.00 · mo $12.00')
 
-  // Off by default: this session's own spend today, beside its whole total.
-  await $.command.run(rings('show session-today'))
-  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect((await band.find({ type: 'Text', text: /session today/ }))?.text).toBe(
-    'session today $2.00 · today $2.00 · mo $2.00',
-  )
-  await band.unmount()
+  // Scoped to this session: the same figures, never more than every session's; the pane switches back.
+  expect((await $.command.run(rings('scope session'))).text).toContain('this session')
+  expect(await totals()).toBe('session: today $2.00 · mo $12.00')
+  const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await pane.select({ key: 'scope', value: 'all' })
+  await pane.unmount()
+  expect(await totals()).toBe('all: today $2.00 · mo $12.00')
 })

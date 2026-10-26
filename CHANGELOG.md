@@ -4,6 +4,12 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 Every release is also on the [GitHub releases page](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases). Update an installed copy with `claude plugin update usage-rings@claude-mod-usage-statusbar`, then `/reload-plugins` or a new session.
 
+## 0.5.0 (2026-10-26)
+
+- **Totals scope**: today and month total every session (`all`, the default) or this session alone (`session`). Switch with `/rings scope all|session` or the settings pane. The figures now say whose they are: `all: today $… · mo $…` or `session: today $… · mo $…`.
+- Month totals now count a session begun this month in full, from its first message, as today already did for a session begun today; one begun earlier counts from when the mod first saw it that month. Both scopes add up the same per-session figures, so `all` is never below `session`.
+- Removed the `session-today` part added in 0.4.0; the session scope shows the same figure.
+
 ## 0.4.0 (2026-10-26)
 
 - The session's figure is marked `session`, so it reads apart from today's and this month's totals, which cover every session. A session left open for days shows its whole cost there, while today counts only this day.

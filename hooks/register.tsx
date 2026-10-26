@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionUsage, Timer } from 'claude-code'
 
-import type { Ledger, Limit, Mode, Part, Preset, RingSettings, Slot, Snapshot, StartSurface } from '../types'
+import type { Ledger, Limit, Mode, Part, Preset, RingSettings, Scope, Slot, Snapshot, StartSurface } from '../types'
 
 const PART_IDS: Part[] = [
   'ctx',
@@ -12,7 +12,6 @@ const PART_IDS: Part[] = [
   'pace',
   'forecast',
   'session',
-  'session-today',
   'day',
   'month',
   'turn',
@@ -21,7 +20,7 @@ const PART_IDS: Part[] = [
   'speed',
   'ttft',
 ]
-const OFF_BY_DEFAULT: Part[] = ['session-today', 'turn', 'rate', 'cache', 'ttft']
+const OFF_BY_DEFAULT: Part[] = ['turn', 'rate', 'cache', 'ttft']
 
 const SLOTS: Slot[] = ['ok', 'warn', 'danger', 'pace', 'track', 'accent']
 const PRESETS: Record<Preset, Record<Slot, string>> = {
@@ -38,6 +37,7 @@ const DEFAULTS: RingSettings = {
   preset: 'default',
   colors: {},
   startShown: { desktop: true, terminal: false },
+  scope: 'all',
 }
 const START_SURFACES: StartSurface[] = ['desktop', 'terminal']
 
@@ -53,7 +53,6 @@ const TEXT = {
       pace: 'Pace tick',
       forecast: 'Forecast',
       session: 'Session spend',
-      'session-today': 'Session today',
       day: 'Today spend',
       month: 'Month spend',
       turn: 'Turn spend',
@@ -74,7 +73,7 @@ const TEXT = {
     resetsIn: (x: string) => `resets in ${x}`,
     gone: (p: number) => `${p}% of the window gone`,
     sessionLabel: 'session',
-    sessionToday: (v: string) => `session today ${v}`,
+    totals: (scope: Scope, figures: string) => `${scope === 'all' ? 'all' : 'session'}: ${figures}`,
     today: (v: string) => `today ${v}`,
     month: (v: string) => `mo ${v}`,
     turn: (v: string) => `${v}/turn`,
@@ -89,6 +88,8 @@ const TEXT = {
     show: 'Show',
     colors: 'Colors',
     colorHint: 'Empty a color field to follow the theme. #rgb or #rrggbb.',
+    scope: 'Totals',
+    scopes: { all: 'All sessions', session: 'This session' } as Record<Scope, string>,
     startTitle: 'Show in new sessions',
     surfaces: { desktop: 'Desktop', terminal: 'Terminal' } as Record<StartSurface, string>,
     resetAll: 'Reset to defaults',
@@ -102,6 +103,8 @@ const TEXT = {
     modeSet: (m: string) => `Layout: ${m}.`,
     langHelp: 'Languages: en, zh.',
     langSet: 'Language: English.',
+    scopeHelp: 'Totals: all (every session), session (this one).',
+    scopeSet: (x: Scope) => `Today and month now total ${x === 'all' ? 'every session' : 'this session'}.`,
     partsHelp: (all: string) => `Name one or more parts: ${all}, all.`,
     partsSet: (on: boolean, ids: string, unknown: string) =>
       `${on ? 'Showing' : 'Hiding'} ${ids}.${unknown ? ` Unknown: ${unknown}.` : ''}`,
@@ -118,7 +121,7 @@ const TEXT = {
       `New ${surface} sessions start with the band ${on ? 'shown' : 'hidden'}. This session is unchanged; /rings toggles it.`,
     help: (parts: string, themes: string, slots: string) =>
       [
-        'Usage: /rings [settings | mode tiles|minimal | lang en|zh | show <parts> | hide <parts> | theme <name> | color <slot> <#hex|reset> | default desktop|terminal on|off | reset]',
+        'Usage: /rings [settings | mode tiles|minimal | lang en|zh | scope all|session | show <parts> | hide <parts> | theme <name> | color <slot> <#hex|reset> | default desktop|terminal on|off | reset]',
         `Parts: ${parts}, all`,
         `Themes: ${themes}`,
         `Color slots: ${slots}`,
@@ -135,7 +138,6 @@ const TEXT = {
       pace: '时间刻度',
       forecast: '用满预测',
       session: '本会话花费',
-      'session-today': '本会话今日',
       day: '今日花费',
       month: '本月花费',
       turn: '本轮花费',
@@ -156,7 +158,7 @@ const TEXT = {
     resetsIn: (x: string) => `${x} 后重置`,
     gone: (p: number) => `时间已过 ${p}%`,
     sessionLabel: '本会话',
-    sessionToday: (v: string) => `本会话今日 ${v}`,
+    totals: (scope: Scope, figures: string) => `${scope === 'all' ? '全部' : '本会话'}：${figures}`,
     today: (v: string) => `今日 ${v}`,
     month: (v: string) => `本月 ${v}`,
     turn: (v: string) => `本轮 ${v}`,
@@ -171,6 +173,8 @@ const TEXT = {
     show: '显示',
     colors: '颜色',
     colorHint: '清空颜色框即跟随主题。格式 #rgb 或 #rrggbb。',
+    scope: '合计范围',
+    scopes: { all: '所有会话', session: '本会话' } as Record<Scope, string>,
     startTitle: '新会话默认显示',
     surfaces: { desktop: '桌面端', terminal: '终端' } as Record<StartSurface, string>,
     resetAll: '恢复默认',
@@ -184,6 +188,8 @@ const TEXT = {
     modeSet: (m: string) => `布局：${m}。`,
     langHelp: '语言：en、zh。',
     langSet: '语言：中文。',
+    scopeHelp: '合计范围：all（所有会话）、session（本会话）。',
+    scopeSet: (x: Scope) => `今日和本月现在统计${x === 'all' ? '所有会话' : '本会话'}。`,
     partsHelp: (all: string) => `请写出一个或多个组件：${all}、all。`,
     partsSet: (on: boolean, ids: string, unknown: string) =>
       `已${on ? '显示' : '隐藏'} ${ids}。${unknown ? `未知：${unknown}。` : ''}`,
@@ -200,7 +206,7 @@ const TEXT = {
       `${surface}新会话默认${on ? '显示' : '隐藏'}面板。当前会话不变，可用 /rings 切换。`,
     help: (parts: string, themes: string, slots: string) =>
       [
-        '用法：/rings [settings | mode tiles|minimal | lang en|zh | show <组件> | hide <组件> | theme <名称> | color <槽> <#hex|reset> | default desktop|terminal on|off | reset]',
+        '用法：/rings [settings | mode tiles|minimal | lang en|zh | scope all|session | show <组件> | hide <组件> | theme <名称> | color <槽> <#hex|reset> | default desktop|terminal on|off | reset]',
         `组件：${parts}、all`,
         `主题：${themes}`,
         `颜色槽：${slots}`,
@@ -218,7 +224,7 @@ const minute = atom({ plugin: 'usage-rings', key: 'minute' } as const, 0)
 const settings = atom({ plugin: 'usage-rings', key: 'settings' } as const, DEFAULTS)
 const stream = atom({ plugin: 'usage-rings', key: 'stream' } as const, { isStreaming: false })
 const turn = atom({ plugin: 'usage-rings', key: 'turn' } as const, { startUsd: null, usd: null })
-const sessionDay = atom({ plugin: 'usage-rings', key: 'sessionDay' } as const, null)
+const own = atom({ plugin: 'usage-rings', key: 'own' } as const, null)
 
 // $.store keys, shared by every session. A session's spend on a day is one figure under
 // USD + `<day>:<session id>:<startedAt>`, set (never added to), so a reload or a resume
@@ -227,6 +233,9 @@ const sessionDay = atom({ plugin: 'usage-rings', key: 'sessionDay' } as const, n
 // the day this scheme first ran.
 const USD = 'usd:'
 const BASE = 'base:'
+// The same for a month: MON + `<month>:<session id>:<startedAt>`, MBASE its starting cost.
+const MON = 'mon:'
+const MBASE = 'mbase:'
 const SINCE = 'since'
 const LEDGER = 'ledger'
 const SPEND = 'spend:'
@@ -311,6 +320,7 @@ const toSettings = (v: unknown): RingSettings => {
     parts,
     preset: raw.preset && raw.preset in PRESETS ? raw.preset : 'default',
     colors,
+    scope: raw.scope === 'session' ? 'session' : 'all',
     startShown: {
       desktop: typeof raw.startShown?.desktop === 'boolean' ? raw.startShown.desktop : DEFAULTS.startShown.desktop,
       terminal: typeof raw.startShown?.terminal === 'boolean' ? raw.startShown.terminal : DEFAULTS.startShown.terminal,
@@ -415,44 +425,72 @@ async function account($: EngineInterface, usd: number | undefined) {
 
   const day = dayKey(await $.clock.now())
   const startedAt = (await read($, snapshot))?.startedAt
-  const segment = `${day}:${await $.session.id()}:${startedAt ?? 0}`
-  // A session begun today counts from its first message, whenever the mod loaded. One begun
-  // earlier counts from what it had cost when this day began here: the last cost seen.
-  let base = 0
-  if (startedAt === undefined || dayKey(startedAt) !== day) {
-    const kept = await $.store.get(BASE + segment)
-    if (typeof kept === 'number') base = kept
-    else {
-      base = Math.min(seen ?? usd, usd)
-      await $.store.set(BASE + segment, base)
+  const began = startedAt === undefined ? undefined : dayKey(startedAt)
+  const session = `${await $.session.id()}:${startedAt ?? 0}`
+  // A session begun within the day (or month) counts from its first message, whenever the mod
+  // loaded. One begun earlier counts from what it had cost when that period began here.
+  const record = async (figure: string, baseKey: string, isWhole: boolean) => {
+    let base = 0
+    if (!isWhole) {
+      const kept = await $.store.get(baseKey)
+      if (typeof kept === 'number') base = kept
+      else {
+        base = Math.min(seen ?? usd, usd)
+        await $.store.set(baseKey, base)
+      }
     }
+    const spent = Math.max(0, usd - base)
+    if ((await $.store.get(figure)) !== spent) await $.store.set(figure, spent)
   }
-  const spent = Math.max(0, usd - base)
-  if ((await $.store.get(USD + segment)) !== spent) await $.store.set(USD + segment, spent)
-  await update($, sessionDay, d => (d?.day === day && d.usd === spent ? d : { day, usd: spent }))
+  await record(`${USD}${day}:${session}`, `${BASE}${day}:${session}`, began === day)
+  const month = day.slice(0, 7)
+  await record(`${MON}${month}:${session}`, `${MBASE}${month}:${session}`, began?.slice(0, 7) === month)
   await refreshLedger($)
 }
 
-// The day a store key's figure belongs to, from `<prefix><YYYY-MM-DD>...`.
+// The period a store key's figure belongs to, from `<prefix><YYYY-MM-DD>...` or `<prefix><YYYY-MM>...`.
 const dayOf = (key: string, prefix: string) => key.slice(prefix.length, prefix.length + 10)
+const monthOf = (key: string, prefix: string) => key.slice(prefix.length, prefix.length + 7)
 
-// Today's and this month's totals: every session's figures summed, plus the older ledgers'
-// figures for days before this scheme ran.
+// Today's and this month's totals, for every session and for this one: each session's figures
+// summed, plus the older ledgers' figures for days before this scheme ran.
 async function refreshLedger($: EngineInterface) {
   const day = dayKey(await $.clock.now())
   const month = day.slice(0, 7)
   const kept = await $.store.get(SINCE)
   const since = typeof kept === 'string' ? kept : day
+  const mine = `${await $.session.id()}:${(await read($, snapshot))?.startedAt ?? 0}`
   let dayUsd = 0
   let monthUsd = 0
-  const add = (d: string, usd: unknown) => {
-    if (typeof usd !== 'number' || d.slice(0, 7) !== month) return
-    monthUsd += usd
-    if (d === day) dayUsd += usd
-  }
+  let ownDay = 0
+  let ownMonth = 0
+  // A session with no month figure yet (one 0.3.2 or 0.4.0 recorded) counts its days instead.
+  const daysOf = new Map<string, number>()
+  const withMonth = new Set<string>()
   for (const key of await $.store.keys()) {
-    if (key.startsWith(USD)) add(dayOf(key, USD), await $.store.get(key))
-    else if (key.startsWith(SPEND) && dayOf(key, SPEND) < since) add(dayOf(key, SPEND), await $.store.get(key))
+    const usd = await $.store.get(key)
+    if (typeof usd !== 'number') continue
+    if (key.startsWith(USD) && monthOf(key, USD) === month) {
+      const session = key.slice(USD.length + 11)
+      daysOf.set(session, (daysOf.get(session) ?? 0) + usd)
+      if (dayOf(key, USD) === day) {
+        dayUsd += usd
+        if (session === mine) ownDay += usd
+      }
+    } else if (key.startsWith(MON) && monthOf(key, MON) === month) {
+      const session = key.slice(MON.length + 8)
+      withMonth.add(session)
+      monthUsd += usd
+      if (session === mine) ownMonth += usd
+    } else if (key.startsWith(SPEND) && monthOf(key, SPEND) === month && dayOf(key, SPEND) < since) {
+      monthUsd += usd
+      if (dayOf(key, SPEND) === day) dayUsd += usd
+    }
+  }
+  for (const [session, usd] of daysOf) {
+    if (withMonth.has(session)) continue
+    monthUsd += usd
+    if (session === mine) ownMonth += usd
   }
   const legacy = await $.store.get(LEDGER)
   if (isLedger(legacy) && legacy.month === month) {
@@ -462,11 +500,10 @@ async function refreshLedger($: EngineInterface) {
   }
   // A write redraws the band: skip it when the cents shown would not change.
   const cents = (v: number) => Math.round(v * 100)
-  await update($, ledger, l =>
-    l && l.day === day && cents(l.dayUsd) === cents(dayUsd) && cents(l.monthUsd) === cents(monthUsd)
-      ? l
-      : { day, month, dayUsd, monthUsd },
-  )
+  const same = (l: Ledger | null, d: number, m: number) =>
+    l !== null && l.day === day && cents(l.dayUsd) === cents(d) && cents(l.monthUsd) === cents(m)
+  await update($, ledger, l => (same(l, dayUsd, monthUsd) ? l : { day, month, dayUsd, monthUsd }))
+  await update($, own, l => (same(l, ownDay, ownMonth) ? l : { day, month, dayUsd: ownDay, monthUsd: ownMonth }))
 }
 
 // Drops figures from months before this one, and marks the day this scheme first ran.
@@ -475,8 +512,8 @@ async function pruneLedger($: EngineInterface) {
   const month = day.slice(0, 7)
   if (typeof (await $.store.get(SINCE)) !== 'string') await $.store.set(SINCE, day)
   for (const key of await $.store.keys()) {
-    const prefix = [USD, BASE, SPEND].find(p => key.startsWith(p))
-    if (prefix && dayOf(key, prefix).slice(0, 7) !== month) await $.store.delete(key)
+    const prefix = [USD, BASE, MON, MBASE, SPEND].find(p => key.startsWith(p))
+    if (prefix && monthOf(key, prefix) !== month) await $.store.delete(key)
   }
   const legacy = await $.store.get(LEDGER)
   if (legacy !== undefined && !(isLedger(legacy) && legacy.month === month)) await $.store.delete(LEDGER)
@@ -526,6 +563,12 @@ async function runCommand($: EngineInterface, args: string): Promise<string> {
     await change($, s => ({ ...s, lang }))
     return TEXT[lang].langSet
   }
+  if (verb === 'scope') {
+    const scope = rest[0]
+    if (scope !== 'all' && scope !== 'session') return w.scopeHelp
+    await change($, s => ({ ...s, scope }))
+    return w.scopeSet(scope)
+  }
   if (verb === 'show' || verb === 'hide') {
     const ids = rest.includes('all') ? PART_IDS : rest
     const known = ids.filter((id): id is Part => PART_IDS.includes(id as Part))
@@ -570,7 +613,7 @@ export const register: Register = on => {
     await $.command.register({
       name: 'rings',
       description: 'Hide or show the usage rings in this session; /rings settings to configure them',
-      argumentHint: '[settings | mode | lang | show | hide | theme | color | default | reset]',
+      argumentHint: '[settings | mode | lang | scope | show | hide | theme | color | default | reset]',
     })
 
     const usage = await $.session.usage()
@@ -715,10 +758,17 @@ export const register: Register = on => {
               ]}
               onSelect={v => void change($, x => ({ ...x, lang: v === 'zh' ? 'zh' : 'en' }))}
             />
+            <Select
+              key="scope"
+              label={w.scope}
+              value={s.scope}
+              options={(['all', 'session'] as const).map(x => ({ value: x, label: w.scopes[x] }))}
+              onSelect={v => void change($, x => ({ ...x, scope: v === 'session' ? 'session' : 'all' }))}
+            />
           </Box>
         ) : (
           <Text dimColor>
-            {w.layout} {w.modes[s.mode]} · {w.theme} {s.preset} · {w.language} {s.lang}
+            {w.layout} {w.modes[s.mode]} · {w.theme} {s.preset} · {w.language} {s.lang} · {w.scope} {w.scopes[s.scope]}
           </Text>
         )}
         <Text weight="semibold">{w.show}</Text>
@@ -855,12 +905,12 @@ export const register: Register = on => {
     const spend: Figure[] = []
     if (show.session)
       spend.push({ key: 'session', text: money(sessionUsd), color: palette.accent, label: w.sessionLabel })
-    const mine = await read($, sessionDay)
-    if (show['session-today'])
-      spend.push({ key: 'session-today', text: w.sessionToday(money(mine?.day === today ? mine.usd : 0)) })
-    if (show.day) spend.push({ key: 'day', text: w.today(money(book?.day === today ? book.dayUsd : 0)) })
-    if (show.month)
-      spend.push({ key: 'month', text: w.month(money(book?.month === today.slice(0, 7) ? book.monthUsd : 0)) })
+    // Today and month, for every session or this one, from the same per-session figures.
+    const totalsOf = s.scope === 'all' ? book : await read($, own)
+    const dayUsd = totalsOf?.day === today ? totalsOf.dayUsd : 0
+    const monthUsd = totalsOf?.month === today.slice(0, 7) ? totalsOf.monthUsd : 0
+    const totals = [show.day ? w.today(money(dayUsd)) : '', show.month ? w.month(money(monthUsd)) : ''].filter(Boolean)
+    if (totals.length > 0) spend.push({ key: 'totals', text: w.totals(s.scope, totals.join(' · ')) })
     if (show.turn && spent.usd !== null && spent.startUsd !== null)
       spend.push({ key: 'turn', text: w.turn(money(Math.max(0, spent.usd - spent.startUsd))) })
     if (show.rate && hours > 1 / 60) spend.push({ key: 'rate', text: w.rate(money(sessionUsd / hours)) })

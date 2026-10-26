@@ -4,6 +4,12 @@
 
 每个版本也发布在 [GitHub releases 页面](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases)。已安装的用户运行 `claude plugin update usage-rings@claude-mod-usage-statusbar` 更新，然后执行 `/reload-plugins` 或开新会话。
 
+## 0.5.0 (2026-10-26)
+
+- **合计范围**：今日和本月可以统计所有会话（`all`，默认），也可以只统计本会话（`session`）。用 `/rings scope all|session` 或设置面板切换。数字前面标明统计范围：`全部：今日 $… · 本月 $…` 或 `本会话：今日 $… · 本月 $…`。
+- 本月合计里，本月开始的会话从第一条消息起全部计入，和今日合计对当天开始的会话的处理一致；更早开始的会话从 mod 当月第一次看到它时算起。两种范围用的是同一份按会话记录的数据，所以 `all` 不会小于 `session`。
+- 移除 0.4.0 新增的 `session-today` 组件；只统计本会话时显示的就是这个数。
+
 ## 0.4.0 (2026-10-26)
 
 - 本会话花费旁边加上 `本会话` 标注，和覆盖所有会话的今日、本月合计区分开。开了好几天的会话，这里显示的是它开着以来的全部花费，而今日只算当天。

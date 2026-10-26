@@ -20,7 +20,6 @@ export type Part =
   | 'pace'
   | 'forecast'
   | 'session'
-  | 'session-today'
   | 'day'
   | 'month'
   | 'turn'
@@ -30,6 +29,8 @@ export type Part =
   | 'ttft'
 export type Slot = 'ok' | 'warn' | 'danger' | 'pace' | 'track' | 'accent'
 export type Preset = 'default' | 'ocean' | 'grape' | 'mono'
+// Whose spend the today and month figures total: every session's, or this one's.
+export type Scope = 'all' | 'session'
 // Where a session starts: the terminal, or a graphical surface (desktop, VS Code, mobile).
 export type StartSurface = 'desktop' | 'terminal'
 export type RingSettings = {
@@ -40,6 +41,7 @@ export type RingSettings = {
   colors: Partial<Record<Slot, string>>
   // Whether a new session on that surface starts with the band shown.
   startShown: Record<StartSurface, boolean>
+  scope: Scope
 }
 
 // The model's output speed for the main loop: live while a response streams, exact once it ends.
@@ -51,8 +53,6 @@ export type RingStream = {
   cacheHit?: number
 }
 export type RingTurn = { startUsd: number | null; usd: number | null }
-// What this session has spent on `day`, as the ledger records it.
-export type RingSessionDay = { day: string; usd: number }
 
 declare module 'claude-code' {
   interface PluginState {
@@ -66,7 +66,8 @@ declare module 'claude-code' {
       settings: RingSettings
       stream: RingStream
       turn: RingTurn
-      sessionDay: RingSessionDay | null
+      // This session's own figures, from the ledger: what the session scope shows.
+      own: Ledger | null
     }
   }
 }
