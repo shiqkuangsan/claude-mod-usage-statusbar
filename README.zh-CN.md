@@ -27,21 +27,24 @@
 
 ## 设置
 
-运行 `/rings settings` 打开设置面板，可以选择布局、主题和语言，逐项开关组件，以及自定义颜色。也可以直接在输入框里用命令修改：
+运行 `/rings settings` 打开设置面板，可以选择布局、主题和语言，逐项开关组件，设置新会话在哪些端默认显示，以及自定义颜色。也可以直接在输入框里用命令修改：
 
 | 命令 | 作用 |
 | --- | --- |
-| `/rings` | 隐藏或显示面板 |
+| `/rings` | 在当前会话隐藏或显示面板 |
 | `/rings mode tiles` / `/rings mode minimal` | 切换布局 |
 | `/rings lang en` / `/rings lang zh` | 英文（默认）或中文 |
 | `/rings show <组件>` / `/rings hide <组件>` | 显示或隐藏组件，可以一次写多个，或写 `all` |
 | `/rings theme <名称>` | `default`、`ocean`、`grape` 或 `mono` |
 | `/rings color <颜色槽> <#hex>` | 覆盖某个颜色；颜色写成 `reset` 则恢复跟随主题 |
+| `/rings default desktop on` / `/rings default terminal off` | 设置该端的新会话是否默认显示面板；单独运行 `/rings default` 查看当前设置 |
 | `/rings reset` | 恢复默认设置，语言保持不变 |
 
 组件：`ctx`、`5h`、`7d`、`models`（按模型的限额和花费上限）、`resets`（重置倒计时）、`pace`（时间刻度）、`forecast`（用满预测）、`session`（本会话花费）、`day`（今日花费）、`month`（本月花费）、`turn`（本轮花费）、`rate`（每小时花费）、`cache`（缓存命中率）、`speed`（输出速度）、`ttft`（首 token 延迟）。除 `turn`、`rate`、`cache`、`ttft` 外默认全部开启。
 
 颜色槽：`ok`、`warn`、`danger`（圆环的三档颜色）、`pace`（时间刻度）、`track`（圆环底色）、`accent`（本会话花费）。
+
+新会话在桌面端默认显示面板，在终端默认隐藏；VS Code 和移动端跟随桌面端的设置。面板隐藏时仍会累计花费，所以今日和本月总额包含所有会话。
 
 设置保存在 Claude Code 的插件存储里，所有会话共用；在一个会话里改了设置，已经在运行的其他会话要在下次启动时才会生效。
 

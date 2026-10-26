@@ -27,21 +27,24 @@ Ring colors follow the level: ok under 60%, warn under 85%, danger above. In the
 
 ## Settings
 
-Run `/rings settings` to open a pane where you pick the layout, theme and language, switch each part on or off, and set colors. The same can be done from the prompt:
+Run `/rings settings` to open a pane where you pick the layout, theme and language, switch each part on or off, choose where new sessions show the band, and set colors. The same can be done from the prompt:
 
 | Command | Does |
 | --- | --- |
-| `/rings` | Hide or show the band |
+| `/rings` | Hide or show the band in this session |
 | `/rings mode tiles` / `/rings mode minimal` | Switch the layout |
 | `/rings lang en` / `/rings lang zh` | English (default) or Chinese |
 | `/rings show <parts>` / `/rings hide <parts>` | Switch parts on or off, several at once, or `all` |
 | `/rings theme <name>` | `default`, `ocean`, `grape` or `mono` |
 | `/rings color <slot> <#hex>` | Override one color; `reset` in place of the color follows the theme again |
+| `/rings default desktop on` / `/rings default terminal off` | Whether new sessions on that surface start with the band shown; `/rings default` alone shows the current choice |
 | `/rings reset` | Back to the defaults, keeping the language |
 
 Parts: `ctx`, `5h`, `7d`, `models` (per-model and spend limits), `resets`, `pace`, `forecast`, `session`, `day`, `month`, `turn`, `rate` ($/h), `cache`, `speed`, `ttft`. All are on by default except `turn`, `rate`, `cache` and `ttft`.
 
 Color slots: `ok`, `warn`, `danger` (ring levels), `pace` (the pace tick), `track` (the ring background), `accent` (session spend).
+
+New sessions show the band in the desktop app and hide it in the terminal; VS Code and mobile follow the desktop choice. A hidden band still counts spend, so today's and this month's totals include every session.
 
 Settings are kept in Claude Code's plugin storage and shared by every session; a session already running picks up changes made in another one when it starts again.
 

@@ -29,12 +29,16 @@ export type Part =
   | 'ttft'
 export type Slot = 'ok' | 'warn' | 'danger' | 'pace' | 'track' | 'accent'
 export type Preset = 'default' | 'ocean' | 'grape' | 'mono'
+// Where a session starts: the terminal, or a graphical surface (desktop, VS Code, mobile).
+export type StartSurface = 'desktop' | 'terminal'
 export type RingSettings = {
   mode: Mode
   lang: Lang
   parts: Record<Part, boolean>
   preset: Preset
   colors: Partial<Record<Slot, string>>
+  // Whether a new session on that surface starts with the band shown.
+  startShown: Record<StartSurface, boolean>
 }
 
 // The model's output speed for the main loop: live while a response streams, exact once it ends.
@@ -53,7 +57,8 @@ declare module 'claude-code' {
       snapshot: Snapshot | null
       ledger: Ledger | null
       seenUsd: number | null
-      isHidden: boolean
+      // null until session.start decides it from the surface and startShown.
+      isHidden: boolean | null
       minute: number
       settings: RingSettings
       stream: RingStream

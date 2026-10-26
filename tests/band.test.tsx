@@ -49,7 +49,7 @@ const PANE = {
 const colorOf = async (ui: { findAll: (q: { type: string; text: string }) => Promise<{ props: Record<string, unknown> }[]> }, text: string) =>
   (await ui.findAll({ type: 'Text', text })).map(t => t.props.color).find(c => c !== undefined)
 
-async function start(...[$, on]: Parameters<TestBody>) {
+async function start(...[$, on, surface = 'desktop']: [...Parameters<TestBody>, ('desktop' | 'terminal')?]) {
   mock.clock(on, { now: NOW })
   mock.store(on)
   on('command.register', () => ({ value: { command: 'rings' } }))
@@ -59,7 +59,7 @@ async function start(...[$, on]: Parameters<TestBody>) {
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.measure', (_, e) => ({ changed: e.changed }))
 
-  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.session.start({ cwd: '/', surface, isInteractive: true })
   await $.session.measure({
     context: { window: 1000000, tokens: 380000, percent: 38 },
     rateLimits: LIMITS,
@@ -183,4 +183,34 @@ test('the band shows the speed and cache hits of the last response', async ($, o
   expect((await band.find({ type: 'Text', text: '80% cache' }))?.text).toBe('80% cache')
   expect((await band.find({ type: 'Text', text: 'ttft 0.0s' }))?.text).toBe('ttft 0.0s')
   await band.unmount()
+})
+
+test('a terminal session starts with the band hidden, and /rings default changes that', async ($, on) => {
+  // Beneath the plugin: the band hook falls through to these when it draws nothing.
+  on('ui.render', ($, e) => {
+    const { Box } = $.ui.resolve(e)
+    return <Box key="engine" />
+  })
+  on('ui.toast', () => ({ value: undefined }))
+  await start($, on, 'terminal')
+
+  const hidden = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await hidden.find({ type: 'Text', text: /ctx/ })).toBe(undefined)
+  await hidden.unmount()
+
+  expect((await $.command.run(rings(''))).text).toContain('shown')
+  const shown = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect((await shown.find({ type: 'Text', text: /ctx/ }))?.text).toContain('38% ctx')
+  await shown.unmount()
+
+  expect((await $.command.run(rings('default'))).text).toContain('Desktop shown, Terminal hidden')
+  expect((await $.command.run(rings('default terminal on'))).text).toContain('New Terminal sessions start with the band shown')
+  expect((await $.command.run(rings('default'))).text).toContain('Terminal shown')
+
+  // The pane flips the same setting.
+  const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await pane.press({ key: 'start-desktop' })
+  expect((await pane.find({ type: 'Button', text: /Desktop/ }))?.text).toBe('○ Desktop')
+  await pane.unmount()
+  expect((await $.command.run(rings('default'))).text).toContain('Desktop hidden, Terminal shown')
 })

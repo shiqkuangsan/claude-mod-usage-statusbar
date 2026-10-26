@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionUsage, Timer } from 'claude-code'
 
-import type { Ledger, Limit, Mode, Part, Preset, RingSettings, Slot, Snapshot } from '../types'
+import type { Ledger, Limit, Mode, Part, Preset, RingSettings, Slot, Snapshot, StartSurface } from '../types'
 
 const PART_IDS: Part[] = [
   'ctx',
@@ -36,7 +36,9 @@ const DEFAULTS: RingSettings = {
   parts: Object.fromEntries(PART_IDS.map(id => [id, !OFF_BY_DEFAULT.includes(id)])) as Record<Part, boolean>,
   preset: 'default',
   colors: {},
+  startShown: { desktop: true, terminal: false },
 }
+const START_SURFACES: StartSurface[] = ['desktop', 'terminal']
 
 // Every word the mod shows, in each language it speaks.
 const TEXT = {
@@ -83,6 +85,8 @@ const TEXT = {
     show: 'Show',
     colors: 'Colors',
     colorHint: 'Empty a color field to follow the theme. #rgb or #rrggbb.',
+    startTitle: 'Show in new sessions',
+    surfaces: { desktop: 'Desktop', terminal: 'Terminal' } as Record<StartSurface, string>,
     resetAll: 'Reset to defaults',
     done: 'Done',
     set: 'set',
@@ -104,13 +108,17 @@ const TEXT = {
     colorReset: (slot: string) => `${slot} follows the theme again.`,
     colorSet: (slot: string, v: string) => `${slot}: ${v}.`,
     resetDone: 'Usage rings settings reset to defaults.',
+    defaultHelp: (now: string) => `Usage: /rings default desktop|terminal on|off. New sessions now: ${now}.`,
+    defaultNow: (surface: string, on: boolean) => `${surface} ${on ? 'shown' : 'hidden'}`,
+    defaultSet: (surface: string, on: boolean) =>
+      `New ${surface} sessions start with the band ${on ? 'shown' : 'hidden'}. This session is unchanged; /rings toggles it.`,
     help: (parts: string, themes: string, slots: string) =>
       [
-        'Usage: /rings [settings | mode tiles|minimal | lang en|zh | show <parts> | hide <parts> | theme <name> | color <slot> <#hex|reset> | reset]',
+        'Usage: /rings [settings | mode tiles|minimal | lang en|zh | show <parts> | hide <parts> | theme <name> | color <slot> <#hex|reset> | default desktop|terminal on|off | reset]',
         `Parts: ${parts}, all`,
         `Themes: ${themes}`,
         `Color slots: ${slots}`,
-        'Run /rings alone to hide or show the band.',
+        'Run /rings alone to hide or show the band in this session.',
       ].join('\n'),
   },
   zh: {
@@ -156,6 +164,8 @@ const TEXT = {
     show: '显示',
     colors: '颜色',
     colorHint: '清空颜色框即跟随主题。格式 #rgb 或 #rrggbb。',
+    startTitle: '新会话默认显示',
+    surfaces: { desktop: '桌面端', terminal: '终端' } as Record<StartSurface, string>,
     resetAll: '恢复默认',
     done: '完成',
     set: '设置',
@@ -177,13 +187,17 @@ const TEXT = {
     colorReset: (slot: string) => `${slot} 已恢复跟随主题。`,
     colorSet: (slot: string, v: string) => `${slot}：${v}。`,
     resetDone: '用量圆环设置已恢复默认。',
+    defaultHelp: (now: string) => `用法：/rings default desktop|terminal on|off。当前新会话：${now}。`,
+    defaultNow: (surface: string, on: boolean) => `${surface}${on ? '显示' : '隐藏'}`,
+    defaultSet: (surface: string, on: boolean) =>
+      `${surface}新会话默认${on ? '显示' : '隐藏'}面板。当前会话不变，可用 /rings 切换。`,
     help: (parts: string, themes: string, slots: string) =>
       [
-        '用法：/rings [settings | mode tiles|minimal | lang en|zh | show <组件> | hide <组件> | theme <名称> | color <槽> <#hex|reset> | reset]',
+        '用法：/rings [settings | mode tiles|minimal | lang en|zh | show <组件> | hide <组件> | theme <名称> | color <槽> <#hex|reset> | default desktop|terminal on|off | reset]',
         `组件：${parts}、all`,
         `主题：${themes}`,
         `颜色槽：${slots}`,
-        '单独运行 /rings 隐藏或显示面板。',
+        '单独运行 /rings 在当前会话隐藏或显示面板。',
       ].join('\n'),
   },
 }
@@ -192,7 +206,7 @@ type Words = (typeof TEXT)['en']
 const snapshot = atom({ plugin: 'usage-rings', key: 'snapshot' } as const, null)
 const ledger = atom({ plugin: 'usage-rings', key: 'ledger' } as const, null)
 const seenUsd = atom({ plugin: 'usage-rings', key: 'seenUsd' } as const, null)
-const isHidden = atom({ plugin: 'usage-rings', key: 'isHidden' } as const, false)
+const isHidden = atom({ plugin: 'usage-rings', key: 'isHidden' } as const, null)
 const minute = atom({ plugin: 'usage-rings', key: 'minute' } as const, 0)
 const settings = atom({ plugin: 'usage-rings', key: 'settings' } as const, DEFAULTS)
 const stream = atom({ plugin: 'usage-rings', key: 'stream' } as const, { isStreaming: false })
@@ -281,6 +295,10 @@ const toSettings = (v: unknown): RingSettings => {
     parts,
     preset: raw.preset && raw.preset in PRESETS ? raw.preset : 'default',
     colors,
+    startShown: {
+      desktop: typeof raw.startShown?.desktop === 'boolean' ? raw.startShown.desktop : DEFAULTS.startShown.desktop,
+      terminal: typeof raw.startShown?.terminal === 'boolean' ? raw.startShown.terminal : DEFAULTS.startShown.terminal,
+    },
   }
 }
 
@@ -412,8 +430,17 @@ async function runCommand($: EngineInterface, args: string): Promise<string> {
   const [verb = '', ...rest] = args.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const w = TEXT[(await read($, settings)).lang]
   if (verb === '') {
-    const hidden = await update($, isHidden, h => !h)
+    const hidden = await update($, isHidden, h => !(h ?? false))
     return hidden ? w.hidden : w.shown
+  }
+  if (verb === 'default') {
+    const [where, value] = rest
+    const s = await read($, settings)
+    if (!START_SURFACES.includes(where as StartSurface) || (value !== 'on' && value !== 'off'))
+      return w.defaultHelp(START_SURFACES.map(x => w.defaultNow(w.surfaces[x], s.startShown[x])).join(', '))
+    const surface = where as StartSurface
+    await change($, x => ({ ...x, startShown: { ...x.startShown, [surface]: value === 'on' } }))
+    return w.defaultSet(w.surfaces[surface], value === 'on')
   }
   if (verb === 'settings') {
     const opened = await $.ui.open({ id: PANE, title: w.paneTitle, focus: true })
@@ -474,8 +501,8 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'rings',
-      description: 'Hide or show the usage rings; /rings settings to configure them',
-      argumentHint: '[settings | mode | lang | show | hide | theme | color | reset]',
+      description: 'Hide or show the usage rings in this session; /rings settings to configure them',
+      argumentHint: '[settings | mode | lang | show | hide | theme | color | default | reset]',
     })
 
     const usage = await $.session.usage()
@@ -496,6 +523,9 @@ export const register: Register = on => {
     if (isLedger(saved)) await update($, ledger, () => saved)
     const stored = toSettings(await $.store.get(SETTINGS))
     await update($, settings, () => stored)
+    // Each surface has its own default; a reload keeps what this session already chose.
+    const where: StartSurface = e.surface === 'terminal' ? 'terminal' : 'desktop'
+    await update($, isHidden, h => h ?? !stored.startShown[where])
 
     // Redraw once a minute so the reset countdowns stay current.
     tick?.cancel()
@@ -632,6 +662,17 @@ export const register: Register = on => {
             />
           ))}
         </Box>
+        <Text weight="semibold">{w.startTitle}</Text>
+        <Box flexDirection="row" flexWrap="wrap" gap={1}>
+          {START_SURFACES.map(x => (
+            <Button
+              key={`start-${x}`}
+              label={`${s.startShown[x] ? '✓' : '○'} ${w.surfaces[x]}`}
+              dimColor={!s.startShown[x]}
+              onPress={() => void change($, v => ({ ...v, startShown: { ...v.startShown, [x]: !v.startShown[x] } }))}
+            />
+          ))}
+        </Box>
         <Text weight="semibold">{w.colors}</Text>
         <Box flexDirection="column" gap={1}>
           {SLOTS.map(slot => (
@@ -681,7 +722,7 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const snap = await read($, snapshot)
-    if (e.props.hasSurvey || snap === null || (await read($, isHidden))) return next(e)
+    if (e.props.hasSurvey || snap === null || (await read($, isHidden)) === true) return next(e)
 
     await read($, minute)
     const t = await $.clock.now()
