@@ -235,7 +235,6 @@ const dayKey = (t: number) => {
 }
 const money = (usd: number) => `$${usd.toFixed(2)}`
 const isHex = (v: unknown): v is string => typeof v === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)
-const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 const span = (ms: number) => {
   const mins = Math.max(0, Math.round(ms / 60000))
@@ -328,8 +327,10 @@ const toGauge = (l: Limit, t: number, w: Words): Gauge => {
 }
 
 // A ring gauge: faint track, an arc from 12 o'clock in the level's color, the percentage inside,
-// an optional tick across the ring where the window's time has got to, and a hover tooltip.
-const ring = (percent: number | undefined, color: string, palette: Palette, title: string, elapsed?: number) => {
+// and an optional tick across the ring where the window's time has got to.
+// Drawn as a plain image, so the markup holds only what the ring shows: the tick moves in whole
+// percents and nothing else changes with the clock, so redraws mostly hand the same image back.
+const ring = (percent: number | undefined, color: string, palette: Palette, elapsed?: number) => {
   const r = 14
   const c = 2 * Math.PI * r
   const p = clamp(percent ?? 0, 0, 100)
@@ -340,7 +341,7 @@ const ring = (percent: number | undefined, color: string, palette: Palette, titl
       : ''
   let tick = ''
   if (elapsed !== undefined) {
-    const a = (clamp(elapsed, 0, 100) / 100) * 2 * Math.PI - Math.PI / 2
+    const a = (Math.round(clamp(elapsed, 0, 100)) / 100) * 2 * Math.PI - Math.PI / 2
     const x = (d: number) => (18 + d * Math.cos(a)).toFixed(2)
     const y = (d: number) => (18 + d * Math.sin(a)).toFixed(2)
     tick = `<line x1="${x(10.2)}" y1="${y(10.2)}" x2="${x(17.8)}" y2="${y(17.8)}" stroke="${palette.pace}" stroke-width="1.8" stroke-linecap="round"/>`
@@ -348,7 +349,7 @@ const ring = (percent: number | undefined, color: string, palette: Palette, titl
   const label = percent === undefined ? '–' : `${Math.round(percent)}%`
   const size = label.length >= 4 ? 8.6 : 10
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36"><title>${escape(title)}</title>` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">` +
     `<circle cx="18" cy="18" r="${r}" fill="none" stroke="${palette.track}" stroke-opacity="0.3" stroke-width="3.5"/>` +
     arc +
     tick +
@@ -520,6 +521,7 @@ export const register: Register = on => {
     let firstAt: number | undefined
     let count = 0
     let shownAt = 0
+    let shown: number | undefined
     try {
       for await (const chunk of next(e)) {
         yield chunk
@@ -527,6 +529,7 @@ export const register: Register = on => {
         if (firstAt === undefined) {
           firstAt = now
           const ttftMs = now - sentAt
+          // The last response's speed stays up until this one has a reading of its own.
           await update($, stream, s => ({ ...s, isStreaming: true, live: undefined, ttftMs }))
         }
         if (chunk.kind === 'text' || chunk.kind === 'thinking') count += roughTokens(chunk.text)
@@ -545,11 +548,14 @@ export const register: Register = on => {
           }))
           continue
         }
-        // Redraw a few times a second at most, not on every piece.
-        if (now - shownAt >= 400 && now - firstAt > 200) {
+        // Once a second at most, and only when the figure drawn would change: each write redraws the band.
+        if (now - shownAt >= 1000 && now - firstAt > 200) {
           shownAt = now
           const live = count / ((now - firstAt) / 1000)
-          await update($, stream, s => ({ ...s, live }))
+          if (Math.round(live) !== shown) {
+            shown = Math.round(live)
+            await update($, stream, s => ({ ...s, live }))
+          }
         }
       }
     } finally {
@@ -732,10 +738,10 @@ export const register: Register = on => {
       spend.push({ key: 'turn', text: w.turn(money(Math.max(0, spent.usd - spent.startUsd))) })
     if (show.rate && hours > 1 / 60) spend.push({ key: 'rate', text: w.rate(money(sessionUsd / hours)) })
 
-    const speedNow = flow.isStreaming ? flow.live : flow.last
+    const speedNow = flow.isStreaming ? (flow.live ?? flow.last) : flow.last
     const speed: Figure[] = []
     if (show.speed && speedNow !== undefined)
-      speed.push({ key: 'speed', text: `${flow.isStreaming ? '~' : ''}${Math.round(speedNow)} tok/s` })
+      speed.push({ key: 'speed', text: `${flow.isStreaming && flow.live !== undefined ? '~' : ''}${Math.round(speedNow)} tok/s` })
     if (show.cache && flow.cacheHit !== undefined) speed.push({ key: 'cache', text: w.cache(Math.round(flow.cacheHit)) })
     if (show.ttft && flow.ttftMs !== undefined) speed.push({ key: 'ttft', text: w.ttft((flow.ttftMs / 1000).toFixed(1)) })
     const cards = [spend, speed].filter(c => c.length > 0)
@@ -754,11 +760,10 @@ export const register: Register = on => {
             const below = secondLine(g)
             const svg = (
               <Svg
-                source={ring(g.percent, colorOf(g), palette, titleOf(g), show.pace ? g.elapsed : undefined)}
+                source={ring(g.percent, colorOf(g), palette, show.pace ? g.elapsed : undefined)}
                 alt={titleOf(g)}
                 width={size}
                 height={size}
-                isInteractive
               />
             )
             if (isMinimal) return <Box key={g.key}>{svg}</Box>

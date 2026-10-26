@@ -16,14 +16,14 @@ A Claude Code mod that keeps a usage band above the prompt, drawn as ring gauges
 - **spend**: this session's cost, plus totals for today and this month, and optionally per turn and per hour
 - **speed**: output tokens per second, live while a response streams (`~58 tok/s`) and exact once it ends, plus optionally cache hits and time to first token
 
-Ring colors follow the level: ok under 60%, warn under 85%, danger above. Hover a ring for everything about it. In the terminal the rings become `○ ◔ ◑ ◕ ●` glyphs, and the pace tick an arrow (`▲` ahead of pace, `▽` behind).
+Ring colors follow the level: ok under 60%, warn under 85%, danger above. In the terminal the rings become `○ ◔ ◑ ◕ ●` glyphs, and the pace tick an arrow (`▲` ahead of pace, `▽` behind).
 
 ## Layouts
 
 | Layout | What it looks like |
 | --- | --- |
 | `tiles` (default) | Each ring with a two-line label: the name, then the forecast when there is one, else the reset time. Spend and speed are a tile each: the first figure on top, the rest below. Sized to sit in one row beside the desktop prompt box. |
-| `minimal` | Rings and the leading spend and speed figures only; the rest is in each ring's hover. |
+| `minimal` | Rings and the leading spend and speed figures only. |
 
 ## Settings
 

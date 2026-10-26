@@ -85,7 +85,9 @@ test('tiles: rings with the percentage inside, a second line each, spend and spe
   expect(fiveHour).toContain('60%</text>')
   expect(fiveHour).toContain('stroke="#f59e0b"')
   expect(fiveHour).toContain('<line')
-  expect(fiveHour).toContain('<title>5h: 60% used · resets in 4h22m')
+  // A plain image: no tooltip, and nothing in it that moves with the clock.
+  expect(fiveHour).not.toContain('<title>')
+  expect(String((await desktop.findAll({ type: 'Svg' }))[0]?.props.isInteractive)).toBe('undefined')
   expect(await svgOf(desktop, 'ctx')).not.toContain('<line')
   expect(await desktop.find({ type: 'Text', text: /cache|ttft/ })).toBe(undefined)
   await desktop.unmount()
