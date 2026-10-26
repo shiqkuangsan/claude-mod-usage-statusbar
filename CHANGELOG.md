@@ -1,5 +1,7 @@
 # Changelog
 
+English | [简体中文](CHANGELOG.zh-CN.md)
+
 Every release is also on the [GitHub releases page](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases). Update an installed copy with `claude plugin update usage-rings@claude-mod-usage-statusbar`, then `/reload-plugins` or a new session.
 
 ## 0.3.0 (2026-10-26)
