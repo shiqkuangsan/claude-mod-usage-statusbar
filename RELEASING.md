@@ -43,7 +43,7 @@ for p in hooks types tests tsconfig.json .claude-plugin/plugin.json; do diff -rq
 | 扫描 | 对要提交的文件跑一次密钥扫描（`scan_secrets` 工具或 `gitleaks detect`），再人工看一遍有没有内网地址或别人的数据 | 无发现 |
 | 提交 | 列出确切文件清单后再 `git commit`；commit message 用英文，`feat:` / `fix:` / `docs:` 前缀，新版本号写在标题括号里 | — |
 | 推送 | `git push origin main`，单独执行 | GitHub 上能看到新提交 |
-| GitHub release | `scripts/release-notes.sh X.Y.Z > <notes 文件>` 生成中英双语 notes，再 `gh release create vX.Y.Z --target <发版提交 sha> --title "vX.Y.Z" --notes-file <notes 文件>`；它会在远端建 tag，之后 `git fetch --tags` 同步到本地。notes 文件放仓库外（如 `outputs/` 或临时目录） | releases 页面显示新版本、标为 Latest，正文有 English 和 中文 两段；README 徽章随后更新 |
+| GitHub release | `scripts/release-notes.sh X.Y.Z > <notes 文件>` 生成中英双语 notes，再 `gh release create vX.Y.Z --target "$(git rev-parse <发版提交>)" --title "vX.Y.Z" --notes-file <notes 文件>`（`--target` 要完整 40 位 SHA，短 SHA 会被 GitHub 以 422 拒绝）；它会在远端建 tag，之后 `git fetch --tags` 同步到本地。notes 文件放仓库外（如 `outputs/` 或临时目录） | releases 页面显示新版本、标为 Latest，正文有 English 和 中文 两段；README 徽章随后更新 |
 | 更新本机 | `claude plugin marketplace update claude-mod-usage-statusbar`，再 `claude plugin update usage-rings@claude-mod-usage-statusbar`，然后在会话里 `/reload-plugins` 或开新会话 | `claude plugin list` 显示新版本 |
 
 ## 注意
