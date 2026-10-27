@@ -4,6 +4,12 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 Every release is also on the [GitHub releases page](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases). Update an installed copy with `claude plugin update usage-rings@claude-mod-usage-statusbar`, then `/reload-plugins` or a new session.
 
+## 0.6.0 (2026-10-27)
+
+- **ctx measures to auto-compact**: the ring now reads against the auto-compact window, as the session rail and `/context` do, and its second line says how many tokens are left before compaction (`204k to compact`). The ring's description keeps the used tokens, the compaction point and the model's window.
+- `/rings ctx compact|model` or the settings pane's Context select switches back to the model's whole window (`163k / 1M`). With auto-compact off, ctx measures against the model's window either way.
+- The settings pane groups the parts as rings, ring details, spend and speed.
+
 ## 0.5.0 (2026-10-26)
 
 - **Totals scope**: today and month total every session (`all`, the default) or this session alone (`session`). Switch with `/rings scope all|session` or the settings pane. The figures now say whose they are: `all: today $… · mo $…` or `session: today $… · mo $…`.

@@ -55,13 +55,23 @@ const DAY = (() => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 })()
 
-async function start(...[$, on, surface = 'desktop']: [...Parameters<TestBody>, ('desktop' | 'terminal')?]) {
+// What /context reports of auto-compact: absent, the session has no breakdown to give.
+type Compaction = { rawMaxTokens: number; autoCompactThreshold?: number; isAutoCompactEnabled: boolean }
+
+async function start(
+  ...[$, on, surface = 'desktop', compaction]: [...Parameters<TestBody>, ('desktop' | 'terminal')?, Compaction?]
+) {
   mock.clock(on, { now: NOW })
   mock.store(on)
   on('session.id', () => ({ value: 'session-a' }))
   on('command.register', () => ({ value: { command: 'rings' } }))
   on('session.usage', () => ({
-    value: { startedAt: NOW - 2 * 3_600_000, context: { window: 1000000 }, rateLimits: [], cost: { usd: 2 } },
+    value: {
+      startedAt: NOW - 2 * 3_600_000,
+      context: { window: 1000000, ...(compaction ? { breakdown: compaction as never } : {}) },
+      rateLimits: [],
+      cost: { usd: 2 },
+    },
   }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.measure', (_, e) => ({ changed: e.changed }))
@@ -116,6 +126,54 @@ test('tiles: rings with the percentage inside, a second line each, spend and spe
   await terminal.unmount()
 })
 
+test('ctx measures against the auto-compact window, as the session rail does, unless turned off', async ($, on) => {
+  await start($, on, 'desktop', { rawMaxTokens: 400000, autoCompactThreshold: 367000, isAutoCompactEnabled: true })
+  await $.session.measure({
+    context: { window: 1000000, tokens: 163000, percent: 16 },
+    rateLimits: LIMITS,
+    cost: { usd: 15.24 },
+    changed: ['context'],
+  })
+
+  const desktop = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect(await svgOf(desktop, 'ctx')).toContain('41%</text>')
+  expect((await desktop.find({ type: 'Text', text: '204k to compact' }))?.text).toBe('204k to compact')
+  // The ring's description keeps every figure, the model's window included.
+  expect((await desktop.findAll({ type: 'Svg' })).find(r => String(r.props.alt).startsWith('ctx'))?.props.alt).toBe(
+    'ctx: 41% used · 163k / 400k · compacts at 367k · model window 1M',
+  )
+  await desktop.unmount()
+  const terminal = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect((await terminal.find({ type: 'Text', text: /ctx/ }))?.text).toContain('◑ 41% ctx 204k to compact')
+  await terminal.unmount()
+
+  // Off: the model's window, as before.
+  expect((await $.command.run(rings('ctx')))?.text).toBe(
+    'Usage: /rings ctx compact|model. ctx measures against the auto-compact window now.',
+  )
+  expect((await $.command.run(rings('ctx model')))?.text).toBe('ctx now measures against the model window.')
+  let band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect(await svgOf(band, 'ctx')).toContain('16%</text>')
+  expect((await band.find({ type: 'Text', text: '163k / 1M' }))?.text).toBe('163k / 1M')
+  await band.unmount()
+
+  // The pane's select turns it back.
+  const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await pane.select({ key: 'ctx', value: 'compact' })
+  await pane.unmount()
+  band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect(await svgOf(band, 'ctx')).toContain('41%</text>')
+  await band.unmount()
+})
+
+test('with auto-compact off, ctx measures against the model window', async ($, on) => {
+  await start($, on, 'desktop', { rawMaxTokens: 1000000, isAutoCompactEnabled: false })
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect(await svgOf(band, 'ctx')).toContain('38%</text>')
+  expect((await band.find({ type: 'Text', text: '380k / 1M' }))?.text).toBe('380k / 1M')
+  await band.unmount()
+})
+
 test('/rings switches the language, the parts, the colors and the layout', async ($, on) => {
   await start($, on)
 
@@ -158,6 +216,10 @@ test('the settings pane toggles parts and picks the layout and language', async 
     await pane.select({ key: 'mode', value: 'minimal' })
     await pane.select({ key: 'lang', value: 'zh' })
     expect((await pane.find({ type: 'Button', text: /上下文/ }))?.text).toBe('○ 上下文')
+    // Every part has its button, under one of the four groups.
+    expect((await pane.findAll({ type: 'Button' })).filter(b => b.key?.startsWith('part-')).length).toBe(15)
+    for (const group of ['圆环', '圆环细节', '花费', '速度'])
+      expect((await pane.find({ type: 'Text', text: group }))?.text).toBe(group)
     await pane.unmount()
 
     const band = await $.ui.mount({ ...BAND, surface })

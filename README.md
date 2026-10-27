@@ -10,7 +10,7 @@ English | [简体中文](README.zh-CN.md)
 
 A Claude Code mod that keeps a usage band above the prompt, drawn as ring gauges with the percentage inside:
 
-- **ctx**: how full the context window is, with the token count
+- **ctx**: how full the context is against the auto-compact window, as the session rail and `/context` measure it, and how many tokens are left before compaction; `/rings ctx model` measures against the model's whole window instead, with the token count
 - **5h** and **7d**: plan rate-limit windows, each with the time left until it resets
 - any per-model weekly window the API reports, under the model's name
 - **pace tick**: a mark across each window's ring where its time has got to, so an arc past the mark means usage runs ahead of time
@@ -29,7 +29,7 @@ Ring colors follow the level: ok under 60%, warn under 85%, danger above. In the
 
 ## Settings
 
-Run `/rings settings` to open a pane where you pick the layout, theme, language and totals scope, switch each part on or off, choose where new sessions show the band, and set colors. The same can be done from the prompt:
+Run `/rings settings` to open a pane where you pick the layout, theme, language, totals scope and what ctx measures against, switch each part on or off (grouped as rings, ring details, spend and speed), choose where new sessions show the band, and set colors. The same can be done from the prompt:
 
 | Command | Does |
 | --- | --- |
@@ -37,6 +37,7 @@ Run `/rings settings` to open a pane where you pick the layout, theme, language 
 | `/rings mode tiles` / `/rings mode minimal` | Switch the layout |
 | `/rings lang en` / `/rings lang zh` | English (default) or Chinese |
 | `/rings scope all` / `/rings scope session` | Whether today and month total every session (default) or this session alone |
+| `/rings ctx compact` / `/rings ctx model` | Whether ctx measures against the auto-compact window (default) or the model's whole window |
 | `/rings show <parts>` / `/rings hide <parts>` | Switch parts on or off, several at once, or `all` |
 | `/rings theme <name>` | `default`, `ocean`, `grape` or `mono` |
 | `/rings color <slot> <#hex>` | Override one color; `reset` in place of the color follows the theme again |
@@ -76,6 +77,7 @@ Requires Claude Code 2.1.287 or later.
 - The live speed is an estimate from the characters streamed (about four per token, one per CJK character); thinking the interface does not show is not counted until the response ends. The figure after a response ends uses the token count the API reports. Subagents' responses are left out.
 - The forecast uses the average rate since the window began, and appears once 5% of the window has gone by.
 - A fresh session shows the last saved rate-limit reading until its first response arrives; context shows `–` until then.
+- With auto-compact off, or before the first reading of the auto-compact window, ctx measures against the model's window.
 
 ## License
 

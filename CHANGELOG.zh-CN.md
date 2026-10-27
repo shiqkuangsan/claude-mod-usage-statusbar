@@ -4,6 +4,12 @@
 
 每个版本也发布在 [GitHub releases 页面](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases)。已安装的用户运行 `claude plugin update usage-rings@claude-mod-usage-statusbar` 更新，然后执行 `/reload-plugins` 或开新会话。
 
+## 0.6.0 (2026-10-27)
+
+- **上下文按自动压缩计算**：圆环改为按自动压缩窗口计算，和 session rail、`/context` 一致，第二行显示距自动压缩还剩多少 token（`距压缩 204k`）。圆环的描述里保留已用 token、压缩点和模型窗口。
+- 用 `/rings ctx compact|model` 或设置面板的「上下文」下拉框切回按模型完整窗口计算（`163k / 1M`）。关闭了自动压缩时，两种设置都按模型窗口计算。
+- 设置面板把组件分成圆环、圆环细节、花费、速度四组。
+
 ## 0.5.0 (2026-10-26)
 
 - **合计范围**：今日和本月可以统计所有会话（`all`，默认），也可以只统计本会话（`session`）。用 `/rings scope all|session` 或设置面板切换。数字前面标明统计范围：`全部：今日 $… · 本月 $…` 或 `本会话：今日 $… · 本月 $…`。

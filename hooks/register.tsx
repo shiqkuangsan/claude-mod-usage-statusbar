@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionUsage, Timer } from 'claude-code'
 
-import type { Ledger, Limit, Mode, Part, Preset, RingSettings, Scope, Slot, Snapshot, StartSurface } from '../types'
+import type { CtxBasis, Ledger, Limit, Mode, Part, Preset, RingSettings, Scope, Slot, Snapshot, StartSurface } from '../types'
 
 const PART_IDS: Part[] = [
   'ctx',
@@ -21,6 +21,14 @@ const PART_IDS: Part[] = [
   'ttft',
 ]
 const OFF_BY_DEFAULT: Part[] = ['turn', 'rate', 'cache', 'ttft']
+// How the settings pane groups the parts; every part sits in one group.
+type PartGroup = 'rings' | 'details' | 'spend' | 'speed'
+const PART_GROUPS: [PartGroup, Part[]][] = [
+  ['rings', ['ctx', '5h', '7d', 'models']],
+  ['details', ['resets', 'pace', 'forecast']],
+  ['spend', ['session', 'day', 'month', 'turn', 'rate']],
+  ['speed', ['speed', 'cache', 'ttft']],
+]
 
 const SLOTS: Slot[] = ['ok', 'warn', 'danger', 'pace', 'track', 'accent']
 const PRESETS: Record<Preset, Record<Slot, string>> = {
@@ -38,6 +46,7 @@ const DEFAULTS: RingSettings = {
   colors: {},
   startShown: { desktop: true, terminal: false },
   scope: 'all',
+  ctxBasis: 'compact',
 }
 const START_SURFACES: StartSurface[] = ['desktop', 'terminal']
 
@@ -72,6 +81,9 @@ const TEXT = {
     used: (label: string, p: string) => `${label}: ${p} used`,
     resetsIn: (x: string) => `resets in ${x}`,
     gone: (p: number) => `${p}% of the window gone`,
+    toCompact: (x: string) => `${x} to compact`,
+    compactsAt: (x: string) => `compacts at ${x}`,
+    modelWindow: (x: string) => `model window ${x}`,
     sessionLabel: 'session',
     totals: (scope: Scope, figures: string) => `${scope === 'all' ? 'all' : 'session'}: ${figures}`,
     today: (v: string) => `today ${v}`,
@@ -91,6 +103,9 @@ const TEXT = {
     scope: 'Totals',
     scopes: { all: 'All sessions', session: 'This session' } as Record<Scope, string>,
     startTitle: 'Show in new sessions',
+    ctxTitle: 'Context',
+    ctxBases: { compact: 'Auto-compact window', model: 'Model window' } as Record<CtxBasis, string>,
+    groups: { rings: 'Rings', details: 'Ring details', spend: 'Spend', speed: 'Speed' } as Record<PartGroup, string>,
     surfaces: { desktop: 'Desktop', terminal: 'Terminal' } as Record<StartSurface, string>,
     resetAll: 'Reset to defaults',
     done: 'Done',
@@ -105,6 +120,12 @@ const TEXT = {
     langSet: 'Language: English.',
     scopeHelp: 'Totals: all (every session), session (this one).',
     scopeSet: (x: Scope) => `Today and month now total ${x === 'all' ? 'every session' : 'this session'}.`,
+    ctxHelp: (now: CtxBasis) =>
+      `Usage: /rings ctx compact|model. ctx measures against ${now === 'compact' ? 'the auto-compact window' : 'the model window'} now.`,
+    ctxSet: (x: CtxBasis): string =>
+      x === 'compact'
+        ? 'ctx now measures against the auto-compact window, and shows what is left before compaction.'
+        : 'ctx now measures against the model window.',
     partsHelp: (all: string) => `Name one or more parts: ${all}, all.`,
     partsSet: (on: boolean, ids: string, unknown: string) =>
       `${on ? 'Showing' : 'Hiding'} ${ids}.${unknown ? ` Unknown: ${unknown}.` : ''}`,
@@ -121,7 +142,7 @@ const TEXT = {
       `New ${surface} sessions start with the band ${on ? 'shown' : 'hidden'}. This session is unchanged; /rings toggles it.`,
     help: (parts: string, themes: string, slots: string) =>
       [
-        'Usage: /rings [settings | mode tiles|minimal | lang en|zh | scope all|session | show <parts> | hide <parts> | theme <name> | color <slot> <#hex|reset> | default desktop|terminal on|off | reset]',
+        'Usage: /rings [settings | mode tiles|minimal | lang en|zh | scope all|session | ctx compact|model | show <parts> | hide <parts> | theme <name> | color <slot> <#hex|reset> | default desktop|terminal on|off | reset]',
         `Parts: ${parts}, all`,
         `Themes: ${themes}`,
         `Color slots: ${slots}`,
@@ -157,6 +178,9 @@ const TEXT = {
     used: (label: string, p: string) => `${label}：已用 ${p}`,
     resetsIn: (x: string) => `${x} 后重置`,
     gone: (p: number) => `时间已过 ${p}%`,
+    toCompact: (x: string) => `距压缩 ${x}`,
+    compactsAt: (x: string) => `${x} 时自动压缩`,
+    modelWindow: (x: string) => `模型窗口 ${x}`,
     sessionLabel: '本会话',
     totals: (scope: Scope, figures: string) => `${scope === 'all' ? '全部' : '本会话'}：${figures}`,
     today: (v: string) => `今日 ${v}`,
@@ -176,6 +200,9 @@ const TEXT = {
     scope: '合计范围',
     scopes: { all: '所有会话', session: '本会话' } as Record<Scope, string>,
     startTitle: '新会话默认显示',
+    ctxTitle: '上下文',
+    ctxBases: { compact: '自动压缩窗口', model: '模型窗口' } as Record<CtxBasis, string>,
+    groups: { rings: '圆环', details: '圆环细节', spend: '花费', speed: '速度' } as Record<PartGroup, string>,
     surfaces: { desktop: '桌面端', terminal: '终端' } as Record<StartSurface, string>,
     resetAll: '恢复默认',
     done: '完成',
@@ -190,6 +217,10 @@ const TEXT = {
     langSet: '语言：中文。',
     scopeHelp: '合计范围：all（所有会话）、session（本会话）。',
     scopeSet: (x: Scope) => `今日和本月现在统计${x === 'all' ? '所有会话' : '本会话'}。`,
+    ctxHelp: (now: CtxBasis) =>
+      `用法：/rings ctx compact|model。上下文当前按${now === 'compact' ? '自动压缩窗口' : '模型窗口'}计算。`,
+    ctxSet: (x: CtxBasis): string =>
+      x === 'compact' ? '上下文现在按自动压缩窗口计算，并显示距压缩还剩多少。' : '上下文现在按模型窗口计算。',
     partsHelp: (all: string) => `请写出一个或多个组件：${all}、all。`,
     partsSet: (on: boolean, ids: string, unknown: string) =>
       `已${on ? '显示' : '隐藏'} ${ids}。${unknown ? `未知：${unknown}。` : ''}`,
@@ -206,7 +237,7 @@ const TEXT = {
       `${surface}新会话默认${on ? '显示' : '隐藏'}面板。当前会话不变，可用 /rings 切换。`,
     help: (parts: string, themes: string, slots: string) =>
       [
-        '用法：/rings [settings | mode tiles|minimal | lang en|zh | scope all|session | show <组件> | hide <组件> | theme <名称> | color <槽> <#hex|reset> | default desktop|terminal on|off | reset]',
+        '用法：/rings [settings | mode tiles|minimal | lang en|zh | scope all|session | ctx compact|model | show <组件> | hide <组件> | theme <名称> | color <槽> <#hex|reset> | default desktop|terminal on|off | reset]',
         `组件：${parts}、all`,
         `主题：${themes}`,
         `颜色槽：${slots}`,
@@ -264,8 +295,10 @@ type Gauge = {
   fullIn?: string
   // Whether the window has a long enough history for a forecast.
   canForecast: boolean
-  // Context's token count, `380k / 1M`.
+  // Context's token count, `380k / 1M`, or what is left before auto-compact.
   note?: string
+  // What the ring's description says in place of the note, when it says more.
+  about?: string
 }
 // One line of text on a tile; `color` marks the value that leads it.
 type Figure = { key: string; text: string; color?: string; isDim?: boolean; label?: string }
@@ -321,6 +354,7 @@ const toSettings = (v: unknown): RingSettings => {
     preset: raw.preset && raw.preset in PRESETS ? raw.preset : 'default',
     colors,
     scope: raw.scope === 'session' ? 'session' : 'all',
+    ctxBasis: raw.ctxBasis === 'model' ? 'model' : 'compact',
     startShown: {
       desktop: typeof raw.startShown?.desktop === 'boolean' ? raw.startShown.desktop : DEFAULTS.startShown.desktop,
       terminal: typeof raw.startShown?.terminal === 'boolean' ? raw.startShown.terminal : DEFAULTS.startShown.terminal,
@@ -519,6 +553,21 @@ async function pruneLedger($: EngineInterface) {
   if (legacy !== undefined && !(isLedger(legacy) && legacy.month === month)) await $.store.delete(LEDGER)
 }
 
+// The auto-compact window and threshold, as /context reports them; the summary breakdown is
+// estimated locally and sends no request. Read on start, once a minute, and when the model's
+// window changes, since none of them moves within a model.
+async function measureCompaction($: EngineInterface) {
+  const b = (await $.session.usage({ breakdown: 'summary' })).context.breakdown
+  const isOn = b?.isAutoCompactEnabled === true && b.rawMaxTokens > 0
+  const compactWindow = isOn ? b.rawMaxTokens : undefined
+  const compactAt = isOn ? (b.autoCompactThreshold ?? b.rawMaxTokens) : undefined
+  await update($, snapshot, s =>
+    s === null || (s.compactWindow === compactWindow && s.compactAt === compactAt)
+      ? s
+      : { ...s, compactWindow, compactAt },
+  )
+}
+
 async function change($: EngineInterface, edit: (s: RingSettings) => RingSettings) {
   const next = await update($, settings, s => toSettings(edit(s)))
   await $.store.set(SETTINGS, next)
@@ -569,6 +618,12 @@ async function runCommand($: EngineInterface, args: string): Promise<string> {
     await change($, s => ({ ...s, scope }))
     return w.scopeSet(scope)
   }
+  if (verb === 'ctx') {
+    const basis = rest[0]
+    if (basis !== 'compact' && basis !== 'model') return w.ctxHelp((await read($, settings)).ctxBasis)
+    await change($, s => ({ ...s, ctxBasis: basis }))
+    return w.ctxSet(basis)
+  }
   if (verb === 'show' || verb === 'hide') {
     const ids = rest.includes('all') ? PART_IDS : rest
     const known = ids.filter((id): id is Part => PART_IDS.includes(id as Part))
@@ -613,7 +668,7 @@ export const register: Register = on => {
     await $.command.register({
       name: 'rings',
       description: 'Hide or show the usage rings in this session; /rings settings to configure them',
-      argumentHint: '[settings | mode | lang | scope | show | hide | theme | color | default | reset]',
+      argumentHint: '[settings | mode | lang | scope | ctx | show | hide | theme | color | default | reset]',
     })
 
     const usage = await $.session.usage()
@@ -624,6 +679,7 @@ export const register: Register = on => {
       if (isLimitList(saved)) snap.limits = saved
     }
     await update($, snapshot, () => snap)
+    await measureCompaction($)
 
     // What it had cost when the mod first saw it: where a session begun on an earlier day counts from.
     if ((await read($, seenUsd)) === null && usage.cost) {
@@ -644,6 +700,7 @@ export const register: Register = on => {
     tick = $.clock.every(60_000, () => {
       void update($, minute, n => n + 1)
       void refreshLedger($)
+      void measureCompaction($)
     })
 
     return next(e)
@@ -651,10 +708,16 @@ export const register: Register = on => {
 
   on('session.measure', async ($, e, next) => {
     const prev = await read($, snapshot)
-    const snap = { ...toSnapshot(e), startedAt: prev?.startedAt }
+    const snap = {
+      ...toSnapshot(e),
+      startedAt: prev?.startedAt,
+      compactWindow: prev?.compactWindow,
+      compactAt: prev?.compactAt,
+    }
     if (snap.limits.length > 0) await $.store.set(LIMITS, snap.limits)
     else snap.limits = prev?.limits ?? []
     await update($, snapshot, () => snap)
+    if (prev && prev.contextWindow !== snap.contextWindow) await measureCompaction($)
     await account($, e.cost?.usd)
     const usd = e.cost?.usd
     if (usd !== undefined) await update($, turn, t => ({ startUsd: t.startUsd ?? usd, usd }))
@@ -765,21 +828,34 @@ export const register: Register = on => {
               options={(['all', 'session'] as const).map(x => ({ value: x, label: w.scopes[x] }))}
               onSelect={v => void change($, x => ({ ...x, scope: v === 'session' ? 'session' : 'all' }))}
             />
+            <Select
+              key="ctx"
+              label={w.ctxTitle}
+              value={s.ctxBasis}
+              options={(['compact', 'model'] as const).map(x => ({ value: x, label: w.ctxBases[x] }))}
+              onSelect={v => void change($, x => ({ ...x, ctxBasis: v === 'model' ? 'model' : 'compact' }))}
+            />
           </Box>
         ) : (
           <Text dimColor>
-            {w.layout} {w.modes[s.mode]} · {w.theme} {s.preset} · {w.language} {s.lang} · {w.scope} {w.scopes[s.scope]}
+            {w.layout} {w.modes[s.mode]} · {w.theme} {s.preset} · {w.language} {s.lang} · {w.scope} {w.scopes[s.scope]} ·{' '}
+            {w.ctxTitle} {w.ctxBases[s.ctxBasis]}
           </Text>
         )}
         <Text weight="semibold">{w.show}</Text>
-        <Box flexDirection="row" flexWrap="wrap" gap={1}>
-          {PART_IDS.map(id => (
-            <Button
-              key={`part-${id}`}
-              label={`${s.parts[id] ? '✓' : '○'} ${w.parts[id]}`}
-              dimColor={!s.parts[id]}
-              onPress={() => void change($, x => ({ ...x, parts: { ...x.parts, [id]: !x.parts[id] } }))}
-            />
+        <Box flexDirection="column" gap={1}>
+          {PART_GROUPS.map(([group, ids]) => (
+            <Box key={`group-${group}`} flexDirection="row" flexWrap="wrap" gap={1} alignItems="center">
+              <Text dimColor>{w.groups[group]}</Text>
+              {ids.map(id => (
+                <Button
+                  key={`part-${id}`}
+                  label={`${s.parts[id] ? '✓' : '○'} ${w.parts[id]}`}
+                  dimColor={!s.parts[id]}
+                  onPress={() => void change($, x => ({ ...x, parts: { ...x.parts, [id]: !x.parts[id] } }))}
+                />
+              ))}
+            </Box>
           ))}
         </Box>
         <Text weight="semibold">{w.startTitle}</Text>
@@ -855,18 +931,31 @@ export const register: Register = on => {
     const ctxTokens =
       snap.contextTokens ??
       (snap.contextPercent === undefined ? undefined : Math.round((snap.contextPercent / 100) * snap.contextWindow))
+    // Against the auto-compact window, as the session rail measures it, when the setting is on and
+    // compaction is; else against the model's whole window.
+    const toCompact = s.ctxBasis === 'compact' && snap.compactWindow !== undefined && ctxTokens !== undefined
+    const ctx: Gauge = toCompact
+      ? {
+          key: 'ctx',
+          label: w.ctx,
+          percent: (ctxTokens / snap.compactWindow!) * 100,
+          canForecast: false,
+          note: w.toCompact(tokens(Math.max(0, (snap.compactAt ?? snap.compactWindow!) - ctxTokens))),
+          about: [
+            `${tokens(ctxTokens)} / ${tokens(snap.compactWindow!)}`,
+            w.compactsAt(tokens(snap.compactAt ?? snap.compactWindow!)),
+            w.modelWindow(tokens(snap.contextWindow)),
+          ].join(' · '),
+        }
+      : {
+          key: 'ctx',
+          label: w.ctx,
+          percent: snap.contextPercent,
+          canForecast: false,
+          note: ctxTokens === undefined ? undefined : `${tokens(ctxTokens)} / ${tokens(snap.contextWindow)}`,
+        }
     const gauges: Gauge[] = [
-      ...(show.ctx
-        ? [
-            {
-              key: 'ctx',
-              label: w.ctx,
-              percent: snap.contextPercent,
-              canForecast: false,
-              note: ctxTokens === undefined ? undefined : `${tokens(ctxTokens)} / ${tokens(snap.contextWindow)}`,
-            },
-          ]
-        : []),
+      ...(show.ctx ? [ctx] : []),
       ...snap.limits.filter(l => show[describe(l.kind, w).part]).map(l => toGauge(l, t, w)),
     ]
 
@@ -880,7 +969,7 @@ export const register: Register = on => {
     const titleOf = (g: Gauge) =>
       [
         w.used(g.label, pctText(g)),
-        g.note,
+        g.about ?? g.note,
         g.reset && w.resetsIn(g.reset),
         g.elapsed !== undefined && w.gone(Math.round(g.elapsed)),
         g.fullIn ? w.full(g.fullIn) : g.canForecast ? w.lasts : undefined,

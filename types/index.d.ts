@@ -3,6 +3,10 @@ export type Snapshot = {
   contextPercent?: number
   contextTokens?: number
   contextWindow: number
+  // The auto-compact window /context measures against, and the count at which compaction runs;
+  // absent with auto-compact off or before the first reading.
+  compactWindow?: number
+  compactAt?: number
   limits: Limit[]
   sessionUsd?: number
   startedAt?: number
@@ -31,6 +35,9 @@ export type Slot = 'ok' | 'warn' | 'danger' | 'pace' | 'track' | 'accent'
 export type Preset = 'default' | 'ocean' | 'grape' | 'mono'
 // Whose spend the today and month figures total: every session's, or this one's.
 export type Scope = 'all' | 'session'
+// What ctx measures against: the auto-compact window, as the session rail does, or the model's
+// whole window.
+export type CtxBasis = 'compact' | 'model'
 // Where a session starts: the terminal, or a graphical surface (desktop, VS Code, mobile).
 export type StartSurface = 'desktop' | 'terminal'
 export type RingSettings = {
@@ -42,6 +49,7 @@ export type RingSettings = {
   // Whether a new session on that surface starts with the band shown.
   startShown: Record<StartSurface, boolean>
   scope: Scope
+  ctxBasis: CtxBasis
 }
 
 // The model's output speed for the main loop: live while a response streams, exact once it ends.
