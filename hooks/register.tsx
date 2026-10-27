@@ -20,7 +20,7 @@ const PART_IDS: Part[] = [
   'speed',
   'ttft',
 ]
-const OFF_BY_DEFAULT: Part[] = ['turn', 'rate', 'cache', 'ttft']
+const OFF_BY_DEFAULT: Part[] = ['forecast', 'turn', 'rate', 'cache', 'ttft']
 // How the settings pane groups the parts; every part sits in one group.
 type PartGroup = 'rings' | 'details' | 'spend' | 'speed'
 const PART_GROUPS: [PartGroup, Part[]][] = [

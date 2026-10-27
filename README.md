@@ -14,7 +14,7 @@ A Claude Code mod that keeps a usage band above the prompt, drawn as ring gauges
 - **5h** and **7d**: plan rate-limit windows, each with the time left until it resets
 - any per-model weekly window the API reports, under the model's name
 - **pace tick**: a mark across each window's ring where its time has got to, so an arc past the mark means usage runs ahead of time
-- **forecast**: when the window's average rate so far would use it up before it resets, the tile says `full ~1h57m` and the ring turns amber
+- **forecast** (off by default, `/rings show forecast`): when the window's average rate so far would use it up before it resets, the tile says `full ~1h57m` and the ring turns amber
 - **spend**: this session's whole cost, marked `session`, then today's and this month's totals, either across every session (`all:`) or for this session alone (`session:`); optionally per turn and per hour
 - **speed**: output tokens per second, live while a response streams (`~58 tok/s`) and exact once it ends, plus optionally cache hits and time to first token
 
@@ -44,7 +44,7 @@ Run `/rings settings` to open a pane where you pick the layout, theme, language,
 | `/rings default desktop on` / `/rings default terminal off` | Whether new sessions on that surface start with the band shown; `/rings default` alone shows the current choice |
 | `/rings reset` | Back to the defaults, keeping the language |
 
-Parts: `ctx`, `5h`, `7d`, `models` (per-model and spend limits), `resets`, `pace`, `forecast`, `session`, `day`, `month`, `turn`, `rate` ($/h), `cache`, `speed`, `ttft`. All are on by default except `turn`, `rate`, `cache` and `ttft`.
+Parts: `ctx`, `5h`, `7d`, `models` (per-model and spend limits), `resets`, `pace`, `forecast`, `session`, `day`, `month`, `turn`, `rate` ($/h), `cache`, `speed`, `ttft`. All are on by default except `forecast`, `turn`, `rate`, `cache` and `ttft`.
 
 Color slots: `ok`, `warn`, `danger` (ring levels), `pace` (the pace tick), `track` (the ring background), `accent` (session spend).
 

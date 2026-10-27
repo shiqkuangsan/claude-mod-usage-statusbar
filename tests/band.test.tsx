@@ -96,14 +96,15 @@ test('tiles: rings with the percentage inside, a second line each, spend and spe
   await start($, on)
 
   const desktop = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  for (const words of ['ctx', '380k / 1M', '5h', 'full ~25m', '7d', '4d17h', 'Fable', '$15.24', 'all: today $15.24 · mo $15.24']) {
+  for (const words of ['ctx', '380k / 1M', '5h', '4h22m', '7d', '4d17h', 'Fable', '$15.24', 'all: today $15.24 · mo $15.24']) {
     expect((await desktop.find({ type: 'Text', text: words }))?.text).toBe(words)
   }
   expect(await colorOf(desktop, '$15.24')).toBe('#22c55e')
   // The session's own total says so; today and month are every session's.
   expect((await desktop.find({ type: 'Text', text: 'session' }))?.text).toBe('session')
-  expect(await colorOf(desktop, 'full ~25m')).toBe('#f59e0b')
-  // 5h runs out before its reset: amber ring, its percentage inside, a tick where the time is.
+  // The forecast is off by default: the reset countdown stays.
+  expect(await desktop.find({ type: 'Text', text: /full/ })).toBe(undefined)
+  // 5h at 60%: amber ring, its percentage inside, a tick where the time is.
   const fiveHour = await svgOf(desktop, '5h')
   expect(fiveHour).toContain('60%</text>')
   expect(fiveHour).toContain('stroke="#f59e0b"')
@@ -120,10 +121,19 @@ test('tiles: rings with the percentage inside, a second line each, spend and spe
   const terminal = await $.ui.mount({ ...BAND, surface: 'terminal' })
   const line = (await terminal.find({ type: 'Text', text: /ctx/ }))?.text ?? ''
   expect(line).toContain('◑ 38% ctx 380k / 1M')
-  expect(line).toContain('◑ 60% ▲ 5h full ~25m')
+  expect(line).toContain('◑ 60% ▲ 5h 4h22m')
   expect(line).toContain('◔ 25% ▽ 7d 4d17h')
   expect(line).toContain('$15.24 session · all: today $15.24 · mo $15.24')
   await terminal.unmount()
+
+  // Turned on, the forecast says when 5h runs out at its rate so far, in amber.
+  await $.command.run(rings('show forecast'))
+  const forecast = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect(await colorOf(forecast, 'full ~25m')).toBe('#f59e0b')
+  await forecast.unmount()
+  const forecastLine = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect((await forecastLine.find({ type: 'Text', text: /ctx/ }))?.text).toContain('◑ 60% ▲ 5h full ~25m')
+  await forecastLine.unmount()
 })
 
 test('ctx measures against the auto-compact window, as the session rail does, unless turned off', async ($, on) => {
@@ -177,7 +187,7 @@ test('with auto-compact off, ctx measures against the model window', async ($, o
 test('/rings switches the language, the parts, the colors and the layout', async ($, on) => {
   await start($, on)
 
-  for (const args of ['lang zh', 'hide day ctx', 'color accent #ff0000', 'theme ocean']) {
+  for (const args of ['lang zh', 'hide day ctx', 'show forecast', 'color accent #ff0000', 'theme ocean']) {
     await $.command.run(rings(args))
   }
   expect((await $.command.run(rings('color ok red'))).text).toContain('#rgb')

@@ -4,6 +4,11 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 Every release is also on the [GitHub releases page](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases). Update an installed copy with `claude plugin update usage-rings@claude-mod-usage-statusbar`, then `/reload-plugins` or a new session.
 
+## 0.6.1 (2026-10-27)
+
+- The forecast (`full ~…` and its amber ring) is now off by default: the pace tick already shows a window running ahead of its time, and early in a window the forecast swung on and off. `/rings show forecast` turns it back on.
+- Saved settings keep the choice they hold: a band whose settings were saved before this release still shows the forecast until `/rings hide forecast`.
+
 ## 0.6.0 (2026-10-27)
 
 - **ctx measures to auto-compact**: the ring now reads against the auto-compact window, as the session rail and `/context` do, and its second line says how many tokens are left before compaction (`204k to compact`). The ring's description keeps the used tokens, the compaction point and the model's window.

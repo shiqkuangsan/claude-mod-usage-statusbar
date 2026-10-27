@@ -4,6 +4,11 @@
 
 每个版本也发布在 [GitHub releases 页面](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases)。已安装的用户运行 `claude plugin update usage-rings@claude-mod-usage-statusbar` 更新，然后执行 `/reload-plugins` 或开新会话。
 
+## 0.6.1 (2026-10-27)
+
+- 用满预测（`full ~…` 和琥珀色圆环）改为默认关闭：时间刻度已经能看出用量跑在时间前面，而且窗口刚开始时预测容易时有时无。用 `/rings show forecast` 重新打开。
+- 已保存的设置保留原来的选择：在这个版本之前保存过设置的面板仍会显示预测，运行 `/rings hide forecast` 关闭。
+
 ## 0.6.0 (2026-10-27)
 
 - **上下文按自动压缩计算**：圆环改为按自动压缩窗口计算，和 session rail、`/context` 一致，第二行显示距自动压缩还剩多少 token（`距压缩 204k`）。圆环的描述里保留已用 token、压缩点和模型窗口。
