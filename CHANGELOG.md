@@ -4,6 +4,11 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 Every release is also on the [GitHub releases page](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases). Update an installed copy with `claude plugin update usage-rings@claude-mod-usage-statusbar`, then `/reload-plugins` or a new session.
 
+## 0.6.2 (2026-10-29)
+
+- A fresh session's rings from the last saved rate-limit reading are now grey and marked `last reading`, with no pace tick or forecast, until the session's first response brings its own. That reading may come from another session signed in to another account.
+- The README notes that the mod cannot tell accounts apart: sessions sharing one config folder share their totals; a separate `CLAUDE_CONFIG_DIR` per account keeps them apart.
+
 ## 0.6.1 (2026-10-27)
 
 - The forecast (`full ~…` and its amber ring) is now off by default: the pace tick already shows a window running ahead of its time, and early in a window the forecast swung on and off. `/rings show forecast` turns it back on.

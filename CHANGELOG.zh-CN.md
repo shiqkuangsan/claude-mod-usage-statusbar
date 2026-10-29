@@ -4,6 +4,11 @@
 
 每个版本也发布在 [GitHub releases 页面](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases)。已安装的用户运行 `claude plugin update usage-rings@claude-mod-usage-statusbar` 更新，然后执行 `/reload-plugins` 或开新会话。
 
+## 0.6.2 (2026-10-29)
+
+- 新会话用上次保存的限额数据画出的圆环，现在显示为灰色并标注 `上次读数`，不显示时间刻度和用满预测，直到本会话第一次响应带来自己的数据。那份数据可能来自登录了另一个账号的会话。
+- README 补充说明 mod 无法区分账号：共用同一个配置目录的会话共用合计；每个账号使用单独的 `CLAUDE_CONFIG_DIR` 可以分开统计。
+
 ## 0.6.1 (2026-10-27)
 
 - 用满预测（`full ~…` 和琥珀色圆环）改为默认关闭：时间刻度已经能看出用量跑在时间前面，而且窗口刚开始时预测容易时有时无。用 `/rings show forecast` 重新打开。

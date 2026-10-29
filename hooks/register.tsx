@@ -78,6 +78,7 @@ const TEXT = {
     spendLimit: 'spend',
     full: (x: string) => `full ~${x}`,
     lasts: 'lasts to reset',
+    stale: 'last reading',
     used: (label: string, p: string) => `${label}: ${p} used`,
     resetsIn: (x: string) => `resets in ${x}`,
     gone: (p: number) => `${p}% of the window gone`,
@@ -175,6 +176,7 @@ const TEXT = {
     spendLimit: '花费上限',
     full: (x: string) => `约 ${x} 用满`,
     lasts: '撑得到重置',
+    stale: '上次读数',
     used: (label: string, p: string) => `${label}：已用 ${p}`,
     resetsIn: (x: string) => `${x} 后重置`,
     gone: (p: number) => `时间已过 ${p}%`,
@@ -295,6 +297,8 @@ type Gauge = {
   fullIn?: string
   // Whether the window has a long enough history for a forecast.
   canForecast: boolean
+  // Whether the reading is one saved before this session's first response.
+  isStale?: boolean
   // Context's token count, `380k / 1M`, or what is left before auto-compact.
   note?: string
   // What the ring's description says in place of the note, when it says more.
@@ -384,14 +388,18 @@ const describe = (kind: string, w: Words): { label: string; part: Part } => {
 }
 const windowOf = (kind: string) => WINDOWS[kind] ?? (kind.startsWith('seven_day_') ? WINDOWS.seven_day : undefined)
 
-const toGauge = (l: Limit, t: number, w: Words): Gauge => {
+const toGauge = (l: Limit, t: number, w: Words, isStale = false): Gauge => {
   const { label } = describe(l.kind, w)
   const resetsAt = l.resetsAt ? Date.parse(l.resetsAt) : undefined
   // A window whose reset time has passed starts over until fresh data arrives.
-  if (resetsAt !== undefined && resetsAt <= t) return { key: l.kind, label, percent: 0, canForecast: false }
+  if (resetsAt !== undefined && resetsAt <= t) return { key: l.kind, label, percent: 0, canForecast: false, isStale }
 
   const length = windowOf(l.kind)
   const left = resetsAt === undefined ? undefined : resetsAt - t
+  // A saved reading may be another account's: shown muted, with no pace or forecast drawn from it.
+  if (isStale) {
+    return { key: l.kind, label, percent: l.percentUsed, reset: left === undefined ? undefined : span(left), canForecast: false, isStale }
+  }
   const past = length === undefined || left === undefined ? undefined : clamp(length - left, 0, length)
   const gauge: Gauge = {
     key: l.kind,
@@ -673,10 +681,14 @@ export const register: Register = on => {
 
     const usage = await $.session.usage()
     const snap = toSnapshot(usage)
-    // A fresh session has no rate-limit reading until its first response: show the last one saved.
+    // A fresh session has no rate-limit reading until its first response: show the last one saved,
+    // marked stale, since any session may have saved it, signed in to any account.
     if (snap.limits.length === 0) {
       const saved = await $.store.get(LIMITS)
-      if (isLimitList(saved)) snap.limits = saved
+      if (isLimitList(saved)) {
+        snap.limits = saved
+        snap.isLimitsStale = true
+      }
     }
     await update($, snapshot, () => snap)
     await measureCompaction($)
@@ -715,7 +727,10 @@ export const register: Register = on => {
       compactAt: prev?.compactAt,
     }
     if (snap.limits.length > 0) await $.store.set(LIMITS, snap.limits)
-    else snap.limits = prev?.limits ?? []
+    else {
+      snap.limits = prev?.limits ?? []
+      snap.isLimitsStale = prev?.isLimitsStale
+    }
     await update($, snapshot, () => snap)
     if (prev && prev.contextWindow !== snap.contextWindow) await measureCompaction($)
     await account($, e.cost?.usd)
@@ -956,12 +971,12 @@ export const register: Register = on => {
         }
     const gauges: Gauge[] = [
       ...(show.ctx ? [ctx] : []),
-      ...snap.limits.filter(l => show[describe(l.kind, w).part]).map(l => toGauge(l, t, w)),
+      ...snap.limits.filter(l => show[describe(l.kind, w).part]).map(l => toGauge(l, t, w, snap.isLimitsStale)),
     ]
 
     // A window set to run out before it resets reads as a warning even at a low level.
     const colorOf = (g: Gauge) => {
-      if (g.percent === undefined) return MUTED
+      if (g.percent === undefined || g.isStale) return MUTED
       const level = g.percent < 60 ? palette.ok : g.percent < 85 ? palette.warn : palette.danger
       return level === palette.ok && show.forecast && g.fullIn ? palette.warn : level
     }
@@ -969,6 +984,7 @@ export const register: Register = on => {
     const titleOf = (g: Gauge) =>
       [
         w.used(g.label, pctText(g)),
+        g.isStale && w.stale,
         g.about ?? g.note,
         g.reset && w.resetsIn(g.reset),
         g.elapsed !== undefined && w.gone(Math.round(g.elapsed)),
@@ -976,8 +992,10 @@ export const register: Register = on => {
       ]
         .filter(Boolean)
         .join(' · ')
-    // A tile's second line: the forecast when the window is set to run out, else the reset time.
+    // A tile's second line: the forecast when the window is set to run out, else the reset time;
+    // a saved reading says so instead.
     const secondLine = (g: Gauge): Figure | undefined => {
+      if (g.isStale) return { key: `${g.key}-2`, text: w.stale, isDim: true }
       if (show.forecast && g.fullIn) return { key: `${g.key}-2`, text: w.full(g.fullIn), color: palette.warn }
       if (show.resets && g.reset) return { key: `${g.key}-2`, text: g.reset, isDim: true }
       if (g.note) return { key: `${g.key}-2`, text: g.note, isDim: true }

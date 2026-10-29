@@ -380,3 +380,33 @@ test('a session begun on an earlier day counts today from when the mod saw it, a
   await pane.unmount()
   expect(await totals()).toBe('all: today $2.00 · mo $12.00')
 })
+
+test('a fresh session shows the last limits saved as stale until its own reading arrives', async ($, on) => {
+  // Saved by an earlier session, which may have been signed in to another account.
+  const store = new Map<string, unknown>([['limits', LIMITS]])
+  const { spend } = await ledgerSession($, on, store, { startedAt: NOW, usdAtStart: 0 })
+
+  const stale = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const fiveHour = await svgOf(stale, '5h')
+  expect(fiveHour).toContain('60%</text>')
+  expect(fiveHour).toContain('stroke="#9a9a9a"')
+  expect(fiveHour).not.toContain('<line')
+  expect((await stale.findAll({ type: 'Svg' })).find(r => String(r.props.alt).startsWith('5h'))?.props.alt).toBe(
+    '5h: 60% used · last reading · resets in 4h22m',
+  )
+  expect((await stale.findAll({ type: 'Text', text: 'last reading' })).length).toBe(3)
+  await stale.unmount()
+  const staleLine = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect((await staleLine.find({ type: 'Text', text: /5h/ }))?.text).toContain('◑ 60% 5h last reading')
+  await staleLine.unmount()
+
+  // The session's first reading replaces it: colored, with the pace tick and the reset time.
+  await spend(1)
+  const fresh = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const live = await svgOf(fresh, '5h')
+  expect(live).toContain('stroke="#f59e0b"')
+  expect(live).toContain('<line')
+  expect(await fresh.find({ type: 'Text', text: 'last reading' })).toBe(undefined)
+  expect((await fresh.find({ type: 'Text', text: '4h22m' }))?.text).toBe('4h22m')
+  await fresh.unmount()
+})

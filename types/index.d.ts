@@ -8,6 +8,9 @@ export type Snapshot = {
   compactWindow?: number
   compactAt?: number
   limits: Limit[]
+  // Whether `limits` is the last reading saved, from any session (and so maybe another
+  // account), until this session's first response reports its own.
+  isLimitsStale?: boolean
   sessionUsd?: number
   startedAt?: number
 }

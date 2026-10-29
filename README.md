@@ -76,7 +76,8 @@ Requires Claude Code 2.1.287 or later.
 - Day and month spend are summed by the mod itself across sessions, using Claude Code's plugin storage. A session begun today (or this month) counts from its first message for today (or this month), even when the mod loaded later; one begun earlier counts from when the mod first saw it in that day (or month). Days before the install are not counted. With several sessions open, each band picks up the others' spend within a minute.
 - The live speed is an estimate from the characters streamed (about four per token, one per CJK character); thinking the interface does not show is not counted until the response ends. The figure after a response ends uses the token count the API reports. Subagents' responses are left out.
 - The forecast uses the average rate since the window began, and appears once 5% of the window has gone by.
-- A fresh session shows the last saved rate-limit reading until its first response arrives; context shows `–` until then.
+- A fresh session shows the last saved rate-limit reading until its first response arrives, grey and marked `last reading`, with no pace tick or forecast; context shows `–` until then.
+- The mod cannot tell Claude accounts apart. Sessions that share one config folder (`~/.claude`) share their totals and the saved rate-limit reading, whichever account each is signed in to. To keep accounts apart, give each its own `CLAUDE_CONFIG_DIR`.
 - With auto-compact off, or before the first reading of the auto-compact window, ctx measures against the model's window.
 
 ## License

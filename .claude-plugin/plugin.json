@@ -1,6 +1,6 @@
 {
   "name": "usage-rings",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Ring gauges above the prompt for context (to auto-compact, as the session rail shows it), 5h/7d limits with pace and forecast, spend and output speed; tiles or minimal layout, per-part toggles, themes, per-surface default visibility, English and Chinese",
   "author": { "name": "shiqkuangsan" },
   "license": "MIT",
