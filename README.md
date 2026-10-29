@@ -29,7 +29,7 @@ Ring colors follow the level: ok under 60%, warn under 85%, danger above. In the
 
 ## Settings
 
-Run `/rings settings` to open a pane where you pick the layout, theme, language, totals scope and what ctx measures against, switch each part on or off (grouped as rings, ring details, spend and speed), choose where new sessions show the band, and set colors. The same can be done from the prompt:
+Run `/rings settings` to open a pane where you pick the layout, theme, language, totals scope and what ctx measures against, switch each part on or off (grouped as rings, ring details, spend and speed), choose where new sessions show the band, and set colors; its foot names the installed version (`dev` for a working copy). The same can be done from the prompt:
 
 | Command | Does |
 | --- | --- |

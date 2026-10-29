@@ -222,6 +222,8 @@ test('the settings pane toggles parts and picks the layout and language', async 
   for (const surface of ['terminal', 'desktop'] as const) {
     await $.command.run(rings('reset'))
     const pane = await $.ui.mount({ ...PANE, surface })
+    // Its foot names the version: a working copy, as here, reads dev.
+    expect((await pane.find({ type: 'Text', text: 'usage-rings dev' }))?.text).toBe('usage-rings dev')
     await pane.press({ key: 'part-ctx' })
     await pane.select({ key: 'mode', value: 'minimal' })
     await pane.select({ key: 'lang', value: 'zh' })

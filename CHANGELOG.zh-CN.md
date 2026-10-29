@@ -4,6 +4,10 @@
 
 每个版本也发布在 [GitHub releases 页面](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases)。已安装的用户运行 `claude plugin update usage-rings@claude-mod-usage-statusbar` 更新，然后执行 `/reload-plugins` 或开新会话。
 
+## 0.7.0 (2026-10-29)
+
+- `/rings settings` 面板底部显示已安装的版本号（`usage-rings 0.7.0`），开发副本显示 `usage-rings dev`。
+
 ## 0.6.2 (2026-10-29)
 
 - 新会话用上次保存的限额数据画出的圆环，现在显示为灰色并标注 `上次读数`，不显示时间刻度和用满预测，直到本会话第一次响应带来自己的数据。那份数据可能来自登录了另一个账号的会话。

@@ -110,6 +110,7 @@ const TEXT = {
     surfaces: { desktop: 'Desktop', terminal: 'Terminal' } as Record<StartSurface, string>,
     resetAll: 'Reset to defaults',
     done: 'Done',
+    version: (v: string) => `usage-rings ${v}`,
     set: 'set',
     hidden: 'Usage rings hidden. Run /rings to show them again.',
     shown: 'Usage rings shown.',
@@ -208,6 +209,7 @@ const TEXT = {
     surfaces: { desktop: '桌面端', terminal: '终端' } as Record<StartSurface, string>,
     resetAll: '恢复默认',
     done: '完成',
+    version: (v: string) => `usage-rings ${v}`,
     set: '设置',
     hidden: '用量圆环已隐藏，再次运行 /rings 显示。',
     shown: '用量圆环已显示。',
@@ -283,6 +285,9 @@ const HOUR = 3_600_000
 // An installed release loads from the plugin cache; anything else (a dev-mods folder,
 // --plugin-dir, a test) is a working copy, tagged "dev" on the band.
 const isDevRoot = (root: string) => !root.replace(/\\/g, '/').includes('/plugins/cache/')
+// A release's root is `<cache>/<marketplace>/<plugin>/<version>/`: its last folder names the version.
+const versionOf = (root: string) =>
+  isDevRoot(root) ? 'dev' : (root.replace(/\\/g, '/').replace(/\/+$/, '').split('/').pop() ?? 'dev')
 const WINDOWS: Record<string, number> = { five_hour: 5 * HOUR, seven_day: 7 * 24 * HOUR }
 
 type Palette = Record<Slot, string>
@@ -927,6 +932,7 @@ export const register: Register = on => {
           />
           <Button key="close" label={w.done} variant="primary" role="dismiss" onPress={() => void $.ui.close({ id: PANE })} />
         </Box>
+        <Text dimColor>{w.version(versionOf($.plugin.root))}</Text>
       </Box>
     )
   })

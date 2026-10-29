@@ -4,6 +4,10 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 Every release is also on the [GitHub releases page](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases). Update an installed copy with `claude plugin update usage-rings@claude-mod-usage-statusbar`, then `/reload-plugins` or a new session.
 
+## 0.7.0 (2026-10-29)
+
+- The `/rings settings` pane names the installed version at its foot (`usage-rings 0.7.0`), or `usage-rings dev` for a working copy.
+
 ## 0.6.2 (2026-10-29)
 
 - A fresh session's rings from the last saved rate-limit reading are now grey and marked `last reading`, with no pace tick or forecast, until the session's first response brings its own. That reading may come from another session signed in to another account.
