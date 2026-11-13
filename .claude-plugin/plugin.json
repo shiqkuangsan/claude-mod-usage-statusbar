@@ -1,8 +1,10 @@
 {
   "name": "usage-rings",
-  "version": "0.7.1",
-  "description": "Ring gauges above the prompt for context (to the point auto-compact starts), 5h/7d limits with pace and forecast, spend and output speed; tiles or minimal layout, per-part toggles, themes, per-surface default visibility, English and Chinese",
-  "author": { "name": "shiqkuangsan" },
+  "version": "0.8.0",
+  "description": "Ring gauges above the prompt for context (to the point auto-compact starts), 5h/7d limits with pace and forecast, spend, output speed, and chat / project / today token usage from the local session logs with a ▾ panel of usage charts (7 days, by hour, mix by kind and model, top projects); tiles or minimal layout, per-part toggles, themes, per-surface default visibility, English and Chinese",
+  "author": {
+    "name": "shiqkuangsan"
+  },
   "license": "MIT",
   "repository": "https://github.com/shiqkuangsan/claude-mod-usage-statusbar",
   "types": "./types/index.d.ts"

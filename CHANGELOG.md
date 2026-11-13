@@ -4,6 +4,12 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 Every release is also on the [GitHub releases page](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases). Update an installed copy with `claude plugin update usage-rings@claude-mod-usage-statusbar`, then `/reload-plugins` or a new session.
 
+## 0.8.0 (2026-11-06)
+
+- **▾ usage charts**: the band stays 0.7.0's one line, with a `▾` at its right end. It opens, below it, a tile with a ring for each scope (this chat's cache hit rate, the project's and today's share of the week) plus the last 7 days and the last hour, read from Claude Code's local session logs as Token Monitor counts them, and four charts, two to a row across the band: the last 7 days by day against the daily average, today by hour, today's mix by kind (cache read, cache write, input, output) and by model with each model's cost, and the five busiest projects of the week. A pointer over a bar shows its exact figures. In the terminal the charts are rows of block glyphs. `▴` closes it.
+- `/rings usage` prints each scope's tokens and cost, the last 7 days', and today's mix by kind and by model.
+- The mod now reads the session logs under `~/.claude/projects`, and, for a log over 4 MiB, through `tail`. It still makes no network calls. `/rings hide usage` turns the `▾` off and stops the reading.
+
 ## 0.7.1 (2026-11-06)
 
 - Fixed: ctx compacted at about 90%, as it measured against the auto-compact window, which compaction never fills. It now measures to the point where auto-compact starts, so 100% is the moment it compacts (`163k / 367k` reads 44%, not 41%). It now reads higher than the session rail and `/context`. The ring's description names the auto-compact window and the model's window.

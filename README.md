@@ -17,6 +17,7 @@ A Claude Code mod that keeps a usage band above the prompt, drawn as ring gauges
 - **forecast** (off by default, `/rings show forecast`): when the window's average rate so far would use it up before it resets, the tile says `full ~1h57m` and the ring turns amber
 - **spend**: this session's whole cost, marked `session`, then today's and this month's totals, either across every session (`all:`) or for this session alone (`session:`); optionally per turn and per hour
 - **speed**: output tokens per second, live while a response streams (`~58 tok/s`) and exact once it ends, plus optionally cache hits and time to first token
+- **▾ usage charts**: the `▾` at the band's right end opens, from Claude Code's local session logs as Token Monitor counts them, a ring tile for each scope (this chat's cache hit rate, the project's and today's share of the week, the last 7 days and the last hour, with cost and what the cache saved) and four charts: the last 7 days against the daily average, today by hour, today's mix by kind and by model with each model's cost, and the week's five busiest projects. Hover a bar for its exact figures; `▴` closes it. `/rings usage` prints the same figures as text
 
 Ring colors follow the level: ok under 60%, warn under 85%, danger above. In the terminal the rings become `○ ◔ ◑ ◕ ●` glyphs, and the pace tick an arrow (`▲` ahead of pace, `▽` behind).
 
@@ -41,10 +42,11 @@ Run `/rings settings` to open a pane where you pick the layout, theme, language,
 | `/rings show <parts>` / `/rings hide <parts>` | Switch parts on or off, several at once, or `all` |
 | `/rings theme <name>` | `default`, `ocean`, `grape` or `mono` |
 | `/rings color <slot> <#hex>` | Override one color; `reset` in place of the color follows the theme again |
+| `/rings usage` | With the usage part on, each scope's tokens and cost and today's mix by kind and by model |
 | `/rings default desktop on` / `/rings default terminal off` | Whether new sessions on that surface start with the band shown; `/rings default` alone shows the current choice |
 | `/rings reset` | Back to the defaults, keeping the language |
 
-Parts: `ctx`, `5h`, `7d`, `models` (per-model and spend limits), `resets`, `pace`, `forecast`, `session`, `day`, `month`, `turn`, `rate` ($/h), `cache`, `speed`, `ttft`. All are on by default except `forecast`, `turn`, `rate`, `cache` and `ttft`.
+Parts: `ctx`, `5h`, `7d`, `models` (per-model and spend limits), `resets`, `pace`, `forecast`, `session`, `day`, `month`, `turn`, `rate` ($/h), `usage` (chat, project and today), `cache`, `speed`, `ttft`. All are on by default except `forecast`, `turn`, `rate`, `cache` and `ttft`.
 
 Color slots: `ok`, `warn`, `danger` (ring levels), `pace` (the pace tick), `track` (the ring background), `accent` (session spend).
 
@@ -72,7 +74,9 @@ Requires Claude Code 2.1.287 or later.
 
 ## Notes
 
-- Everything shown comes from the usage figures Claude Code reports to the mod. It makes no network calls and reads no files.
+- Everything shown comes from the usage figures Claude Code reports to the mod. It makes no network calls, and reads no files with the usage part off (`/rings hide usage`).
+- The usage part reads Claude Code's session logs, the `.jsonl` files under `~/.claude/projects` (or `$CLAUDE_CONFIG_DIR/projects`): this project folder's, and any other modified in the last 7 days. It reads them again at most every 15 seconds, only the logs that changed. A log over 4 MiB is read with `tail`, from where the last read stopped; where `tail` is missing (Windows), those logs are left out and the figures marked `+`. `/rings hide usage` stops the reading.
+- Usage counts every API response once (by message and request id), a subagent's included. The chat's cost is Claude Code's own, as `/cost` totals it; the project's and today's are estimated from Anthropic's list prices (cache writes at 1.25× input for five minutes, 2× for an hour, fast mode at 2×). A cost marked `+` leaves out responses from a model with no known price.
 - Day and month spend are summed by the mod itself across sessions, using Claude Code's plugin storage. A session begun today (or this month) counts from its first message for today (or this month), even when the mod loaded later; one begun earlier counts from when the mod first saw it in that day (or month). Days before the install are not counted. With several sessions open, each band picks up the others' spend within a minute.
 - The live speed is an estimate from the characters streamed (about four per token, one per CJK character); thinking the interface does not show is not counted until the response ends. The figure after a response ends uses the token count the API reports. Subagents' responses are left out.
 - The forecast uses the average rate since the window began, and appears once 5% of the window has gone by.
