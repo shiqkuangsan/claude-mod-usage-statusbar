@@ -16,6 +16,7 @@ const BAND = {
   component: 'AbovePrompt',
   props: {
     hasSurvey: false,
+    isCollapsed: false,
     isWorking: false,
     maxRows: 10,
     bodyColumns: 200,
@@ -109,9 +110,44 @@ test('tiles: rings with the percentage inside, a second line each, spend and spe
   expect(fiveHour).toContain('60%</text>')
   expect(fiveHour).toContain('stroke="#f59e0b"')
   expect(fiveHour).toContain('<line')
-  // A plain image: no tooltip, and nothing in it that moves with the clock.
+  // A frame whose own CSS answers the pointer on the colored arc alone: the arc grows and glows in
+  // its color. No tooltip, and nothing in it that moves with the clock, since a frame reloads when
+  // its markup changes.
+  expect(fiveHour).toContain('.hit:hover~g .lift{transform:scale(1.1)')
+  expect(fiveHour).toContain('drop-shadow(0 0 1.6px #f59e0b)')
+  expect(fiveHour).toContain('<circle class="hit"')
+  // It lifts with an overshoot and settles back without one, quicker.
+  expect(fiveHour).toContain('.lift{transform-box:fill-box;transform-origin:center;transition:transform .15s ease-out}')
+  // 60% used with 13% of the window gone: a bright line runs from the tick to the arc's end.
+  const c = 2 * Math.PI * 14
+  expect(fiveHour).toContain(
+    `class="pace over" cx="18" cy="18" r="14" fill="none" stroke="#fff" stroke-width="1.3" ` +
+      `stroke-dasharray="${((c * 47) / 100).toFixed(2)} ${c.toFixed(2)}" stroke-dashoffset="${(-(c * 13) / 100).toFixed(2)}"/>`,
+  )
+  // The figure swaps to what is left, with its word under it.
+  expect(fiveHour).toContain('class="left" x="18" y="18.60"')
+  expect(fiveHour).toContain('>40%</text>')
+  expect(fiveHour).toContain('>left</text>')
+  expect(fiveHour).toContain('.hit:hover~.used{opacity:0}.hit:hover~.left{opacity:1}')
+  // 7d at 25% with 33% of the window gone: the room left up to the tick is traced in its color.
+  expect(await svgOf(desktop, '7d')).toContain(
+    `class="pace room" cx="18" cy="18" r="14" fill="none" stroke="#22c55e" stroke-width="3.5" ` +
+      `stroke-dasharray="${((c * 8) / 100).toFixed(2)} ${c.toFixed(2)}" stroke-dashoffset="${(-(c * 25) / 100).toFixed(2)}"/>`,
+  )
+  // ctx has no tick, so nothing to measure against.
+  expect(await svgOf(desktop, 'ctx')).not.toContain('class="pace')
+  // The pointer's band: wide, square-ended, 2% past each end of the 60% arc, started 2% early.
+  const reach = 2 * Math.PI * 17.25
+  expect(fiveHour).toContain(
+    `class="hit" cx="18" cy="18" r="17.25" fill="none" stroke="transparent" stroke-width="13.5" ` +
+      `stroke-dasharray="${((reach * 64) / 100).toFixed(2)} ${reach.toFixed(2)}" transform="rotate(-97.2 18 18)"/>`,
+  )
   expect(fiveHour).not.toContain('<title>')
-  expect(String((await desktop.findAll({ type: 'Svg' }))[0]?.props.isInteractive)).toBe('undefined')
+  expect((await desktop.findAll({ type: 'Svg' }))[0]?.props.isInteractive).toBe(true)
+  // The ring keeps its 32px at rest; its frame is larger by the room around it (48/36).
+  expect((await desktop.findAll({ type: 'Svg' })).find(r => String(r.props.alt).startsWith('5h'))?.props.width).toBe(43)
+  // The dev tag stays a plain image.
+  expect((await desktop.findAll({ type: 'Svg' })).find(r => r.props.alt === 'dev')?.props.isInteractive).toBe(undefined)
   expect(await svgOf(desktop, 'ctx')).not.toContain('<line')
   expect(await desktop.find({ type: 'Text', text: /cache|ttft/ })).toBe(undefined)
   // Loaded from a working copy, not the plugin cache: tagged as the dev build.
@@ -394,6 +430,10 @@ test('a fresh session shows the last limits saved as stale until its own reading
   expect(fiveHour).toContain('60%</text>')
   expect(fiveHour).toContain('stroke="#9a9a9a"')
   expect(fiveHour).not.toContain('<line')
+  // A saved reading is muted: nothing lifts under the pointer, and nothing shows on hover.
+  expect(fiveHour).not.toContain('class="hit"')
+  expect(fiveHour).not.toContain('class="left"')
+  expect(fiveHour).not.toContain('class="pace')
   expect((await stale.findAll({ type: 'Svg' })).find(r => String(r.props.alt).startsWith('5h'))?.props.alt).toBe(
     '5h: 60% used · last reading · resets in 4h22m',
   )
@@ -409,7 +449,27 @@ test('a fresh session shows the last limits saved as stale until its own reading
   const live = await svgOf(fresh, '5h')
   expect(live).toContain('stroke="#f59e0b"')
   expect(live).toContain('<line')
+  expect(live).toContain('class="hit"')
   expect(await fresh.find({ type: 'Text', text: 'last reading' })).toBe(undefined)
   expect((await fresh.find({ type: 'Text', text: '4h22m' }))?.text).toBe('4h22m')
   await fresh.unmount()
+})
+
+test('a short arc still gives the pointer a band of at least 8% of the way round', async ($, on) => {
+  await start($, on)
+  await $.session.measure({
+    context: { window: 1000000, tokens: 380000, percent: 38 },
+    rateLimits: [{ kind: 'five_hour', percentUsed: 2, resetsAt: inMinutes(4 * 60 + 22) }],
+    cost: { usd: 15.24 },
+    changed: ['rateLimits'],
+  })
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const fiveHour = await svgOf(band, '5h')
+  const c = 2 * Math.PI * 14
+  const reach = 2 * Math.PI * 17.25
+  expect(fiveHour).toContain('2%</text>')
+  // The band under the pointer reaches 8%; the arc drawn stays at 2%.
+  expect(fiveHour).toContain(`class="hit" cx="18" cy="18" r="17.25" fill="none" stroke="transparent" stroke-width="13.5" stroke-dasharray="${((reach * 8) / 100).toFixed(2)} `)
+  expect(fiveHour).toContain(`class="arc" cx="18" cy="18" r="14" fill="none" stroke="#22c55e" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="${((c * 2) / 100).toFixed(2)} `)
+  await band.unmount()
 })

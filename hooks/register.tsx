@@ -79,6 +79,7 @@ const TEXT = {
     full: (x: string) => `full ~${x}`,
     lasts: 'lasts to reset',
     stale: 'last reading',
+    ringLeft: 'left',
     used: (label: string, p: string) => `${label}: ${p} used`,
     resetsIn: (x: string) => `resets in ${x}`,
     gone: (p: number) => `${p}% of the window gone`,
@@ -178,6 +179,7 @@ const TEXT = {
     full: (x: string) => `约 ${x} 用满`,
     lasts: '撑得到重置',
     stale: '上次读数',
+    ringLeft: '剩余',
     used: (label: string, p: string) => `${label}：已用 ${p}`,
     resetsIn: (x: string) => `${x} 后重置`,
     gone: (p: number) => `时间已过 ${p}%`,
@@ -423,33 +425,117 @@ const toGauge = (l: Limit, t: number, w: Words, isStale = false): Gauge => {
 
 // A ring gauge: faint track, an arc from 12 o'clock in the level's color, the percentage inside,
 // and an optional tick across the ring where the window's time has got to.
-// Drawn as a plain image, so the markup holds only what the ring shows: the tick moves in whole
-// percents and nothing else changes with the clock, so redraws mostly hand the same image back.
-const ring = (percent: number | undefined, color: string, palette: Palette, elapsed?: number) => {
+// Drawn in a script-less frame so its own CSS can answer the pointer: with the pointer on the
+// colored arc, and only there, the arc grows, thickens and brightens with a soft glow in its
+// color, and two things show that the ring at rest keeps to itself:
+// - against the time tick, the stretch used ahead of the time gone by carries a bright line down
+//   its middle; or, behind it, the room left before the tick is traced in the arc's color;
+// - the figure inside swaps to what is left, with a small word under it.
+// The track and the tick stay as they are. An unseen band over the arc takes the pointer, so the
+// thin line is easy to land on and the growing arc never moves it: nearly four times the arc's
+// width, from just clear of the figure out to the frame's edge, square-ended HIT_PAD past each end of
+// the arc (enough to cover the arc's round caps), and at least HIT_MIN of the way round on a
+// short arc. A muted ring (a saved reading, or no reading) has nothing to lift, so it takes no
+// pointer at all. The arc lifts with a slight overshoot and settles back quicker, without one.
+// A frame reloads when its markup changes, so the markup holds only what the ring shows: the
+// tick moves in whole percents and nothing else changes with the clock, so redraws mostly hand
+// the same markup back.
+// The ring is drawn on a 36-unit square with RING_ROOM units of room around it, for the hover's
+// growth and glow and for the pointer's band to reach out past the ring; the box is drawn larger
+// by the same ratio, so at rest the ring keeps its size.
+const RING_ROOM = 6
+const RING_BOX = 36 + 2 * RING_ROOM
+const ringBox = (size: number) => Math.round((size * RING_BOX) / 36)
+// The pointer's band: its radius and width in the ring's units, and its reach in percent.
+// From 10.5 (just clear of the figure) out to 18 + RING_ROOM, the frame's edge.
+const HIT_R = 17.25
+const HIT_W = 13.5
+const HIT_PAD = 2
+const HIT_MIN = 8
+type RingOptions = {
+  // Where the window's time has got to, in percent: draws the tick.
+  elapsed?: number
+  // A saved reading or no reading: drawn muted, and nothing answers the pointer.
+  isMuted?: boolean
+  // The word under the figure while it shows what is left.
+  leftWord?: string
+}
+const ring = (percent: number | undefined, color: string, palette: Palette, o: RingOptions = {}) => {
   const r = 14
-  const c = 2 * Math.PI * r
   const p = clamp(percent ?? 0, 0, 100)
+  // A stretch of a circle from `from` to `to` percent of the way round, from 12 o'clock.
+  const span = (from: number, to: number, radius = r) => {
+    const round = 2 * Math.PI * radius
+    const len = (round * (clamp(to, 0, 100) - clamp(from, 0, 100))) / 100
+    const offset = from > 0 ? ` stroke-dashoffset="${(-(round * from) / 100).toFixed(2)}"` : ''
+    return `stroke-dasharray="${len.toFixed(2)} ${round.toFixed(2)}"${offset}`
+  }
+  const isLive = p > 0 && !o.isMuted
+  const tickAt = o.elapsed === undefined ? undefined : Math.round(clamp(o.elapsed, 0, 100))
+  // Square-ended, turned back by its pad so it starts that far before 12 o'clock.
+  const hit = isLive
+    ? `<circle class="hit" cx="18" cy="18" r="${HIT_R}" fill="none" stroke="transparent" stroke-width="${HIT_W}" ` +
+      `${span(0, Math.max(p + 2 * HIT_PAD, HIT_MIN), HIT_R)} transform="rotate(${-90 - HIT_PAD * 3.6} 18 18)"/>`
+    : ''
+  // Ahead of the tick: the overrun, lit over the arc. Behind it: the room left, traced faintly.
+  let pace = ''
+  if (isLive && tickAt !== undefined && tickAt !== Math.round(p)) {
+    pace =
+      p > tickAt
+        ? `<circle class="pace over" cx="18" cy="18" r="${r}" fill="none" stroke="#fff" stroke-width="1.3" ${span(tickAt, p)}/>`
+        : `<circle class="pace room" cx="18" cy="18" r="${r}" fill="none" stroke="${color}" stroke-width="3.5" ${span(p, tickAt)}/>`
+  }
   const arc =
     p > 0
-      ? `<circle cx="18" cy="18" r="${r}" fill="none" stroke="${color}" stroke-width="3.5" stroke-linecap="round" ` +
-        `stroke-dasharray="${((c * p) / 100).toFixed(2)} ${c.toFixed(2)}" transform="rotate(-90 18 18)"/>`
+      ? `<g transform="rotate(-90 18 18)"><g class="lift">` +
+        `<circle class="arc" cx="18" cy="18" r="${r}" fill="none" stroke="${color}" stroke-width="3.5" stroke-linecap="round" ${span(0, p)}/>` +
+        pace +
+        `</g></g>`
       : ''
   let tick = ''
-  if (elapsed !== undefined) {
-    const a = (Math.round(clamp(elapsed, 0, 100)) / 100) * 2 * Math.PI - Math.PI / 2
+  if (tickAt !== undefined) {
+    const a = (tickAt / 100) * 2 * Math.PI - Math.PI / 2
     const x = (d: number) => (18 + d * Math.cos(a)).toFixed(2)
     const y = (d: number) => (18 + d * Math.sin(a)).toFixed(2)
     tick = `<line x1="${x(10.2)}" y1="${y(10.2)}" x2="${x(17.8)}" y2="${y(17.8)}" stroke="${palette.pace}" stroke-width="1.8" stroke-linecap="round"/>`
   }
-  const label = percent === undefined ? '–' : `${Math.round(percent)}%`
-  const size = label.length >= 4 ? 8.6 : 10
+  const figure = (text: string, cls: string, y?: number) => {
+    const size = text.length >= 4 ? 8.6 : 10
+    return (
+      `<text class="${cls}" x="18" y="${(y ?? 18 + size * 0.36).toFixed(2)}" text-anchor="middle" ` +
+      `font-family="-apple-system,system-ui,sans-serif" font-size="${size}" font-weight="650" fill="${color}">${text}</text>`
+    )
+  }
+  const used = figure(percent === undefined ? '–' : `${Math.round(percent)}%`, 'used')
+  // What is left, a little above the middle, with its word under it; shown only on hover.
+  const left =
+    isLive && o.leftWord
+      ? figure(`${100 - Math.round(p)}%`, 'left', 18.6) +
+        `<text class="left" x="18" y="25.6" text-anchor="middle" font-family="-apple-system,system-ui,sans-serif" ` +
+        `font-size="6.4" font-weight="600" fill="${palette.track}">${o.leftWord}</text>`
+      : ''
+  const lifted = '.hit:hover~g .lift'
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${RING_BOX}" height="${RING_BOX}" viewBox="${-RING_ROOM} ${-RING_ROOM} ${RING_BOX} ${RING_BOX}">` +
+    `<style>` +
+    `svg *{pointer-events:none}svg .hit{pointer-events:stroke}` +
+    `.lift{transform-box:fill-box;transform-origin:center;transition:transform .15s ease-out}` +
+    `.arc,.pace{transition:stroke-width .15s ease-out,filter .15s ease-out,opacity .15s ease-out}` +
+    `.pace,.left{opacity:0}.used,.left{transition:opacity .15s ease-out}` +
+    `${lifted}{transform:scale(1.1);transition:transform .22s cubic-bezier(.34,1.56,.64,1)}` +
+    `${lifted} .arc{stroke-width:4.4;filter:brightness(1.3) drop-shadow(0 0 1.6px ${color});` +
+    `transition:stroke-width .22s ease,filter .22s ease}` +
+    `${lifted} .pace{transition:stroke-width .22s ease,opacity .22s ease}` +
+    `${lifted} .over{opacity:.9;stroke-width:1.5}${lifted} .room{opacity:.5;stroke-width:4.4}` +
+    `.hit:hover~.used{opacity:0}.hit:hover~.left{opacity:1}` +
+    `@media (prefers-reduced-motion:reduce){*{transition:none!important}${lifted}{transform:none}}` +
+    `</style>` +
     `<circle cx="18" cy="18" r="${r}" fill="none" stroke="${palette.track}" stroke-opacity="0.3" stroke-width="3.5"/>` +
+    hit +
     arc +
     tick +
-    `<text x="18" y="${(18 + size * 0.36).toFixed(2)}" text-anchor="middle" font-family="-apple-system,system-ui,sans-serif" ` +
-    `font-size="${size}" font-weight="650" fill="${color}">${label}</text>` +
+    used +
+    left +
     `</svg>`
   )
 }
@@ -1053,10 +1139,15 @@ export const register: Register = on => {
             const below = secondLine(g)
             const svg = (
               <Svg
-                source={ring(g.percent, colorOf(g), palette, show.pace ? g.elapsed : undefined)}
+                source={ring(g.percent, colorOf(g), palette, {
+                  elapsed: show.pace ? g.elapsed : undefined,
+                  isMuted: colorOf(g) === MUTED,
+                  leftWord: w.ringLeft,
+                })}
                 alt={titleOf(g)}
-                width={size}
-                height={size}
+                width={ringBox(size)}
+                height={ringBox(size)}
+                isInteractive
               />
             )
             if (isMinimal) return <Box key={g.key}>{svg}</Box>

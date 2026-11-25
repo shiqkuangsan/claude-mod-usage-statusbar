@@ -4,6 +4,12 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 Every release is also on the [GitHub releases page](https://github.com/shiqkuangsan/claude-mod-usage-statusbar/releases). Update an installed copy with `claude plugin update usage-rings@claude-mod-usage-statusbar`, then `/reload-plugins` or a new session.
 
+## 0.8.0 (2026-11-25)
+
+- **Rings answer the pointer** in the desktop app: point at a ring's colored arc and the arc lifts, thickens and glows in its color, then settles back when the pointer leaves. Only the arc reacts: the grey track, the pace tick and a grey ring (a saved reading) stay as they are. The area that picks up the pointer is wider than the arc and covers at least 8% of the ring, so a short arc is easy to hit.
+- While the arc is lifted, the 5h and 7d rings show where usage stands against the pace tick: a bright line along the stretch used ahead of time, or a faint trace of the room left before the tick. The figure inside switches to what is left (`40% left`).
+- Each ring's frame is a few pixels wider, to leave room for the hover; the ring itself keeps its size. VS Code draws the rings as images, so hovering does nothing there; the terminal is unchanged.
+
 ## 0.7.1 (2026-11-06)
 
 - Fixed: ctx compacted at about 90%, as it measured against the auto-compact window, which compaction never fills. It now measures to the point where auto-compact starts, so 100% is the moment it compacts (`163k / 367k` reads 44%, not 41%). It now reads higher than the session rail and `/context`. The ring's description names the auto-compact window and the model's window.

@@ -20,6 +20,8 @@ A Claude Code mod that keeps a usage band above the prompt, drawn as ring gauges
 
 Ring colors follow the level: ok under 60%, warn under 85%, danger above. In the terminal the rings become `○ ◔ ◑ ◕ ●` glyphs, and the pace tick an arrow (`▲` ahead of pace, `▽` behind).
 
+In the desktop app, point at a ring's colored arc and the arc lifts and glows. Against the pace tick, a bright line runs along the stretch used ahead of time, or a faint trace shows the room left before the tick, and the figure inside switches to what is left (`40% left`). The grey track and a grey ring (a saved reading) don't react. VS Code draws the rings as plain images, so hovering does nothing there.
+
 ## Layouts
 
 | Layout | What it looks like |
